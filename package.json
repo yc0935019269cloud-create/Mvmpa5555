@@ -1,0 +1,11 @@
+{
+  "name": "optom-3d-clinic",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "自覺式驗光 3D 診間練習遊戲(期中範圍:Ret → 1st MPMVA → 紅綠 → JCC/鐘面圖 → 2nd MPMVA)",
+  "scripts": {
+    "start": "node tools/serve.mjs 8080",
+    "test": "node tests/sim.test.mjs && node tests/flow.test.mjs"
+  }
+}
