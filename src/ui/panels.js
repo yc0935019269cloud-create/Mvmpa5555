@@ -146,7 +146,7 @@ export function lensControls(game, eye, { showAux = true, showJcc = true } = {})
 
 const SLOT_BY_PHASE = { mp1: 'mp1', jcc: 'jcc', mp2: 'mp2' };
 
-function recordBar(game) {
+export function recordBar(game) {
   const def = game.stepDef;
   const eye = game.activeEye;
   const ph = def.phase;
@@ -295,7 +295,7 @@ export function buildRet(game, ctx) {
     const eye = view.eye;
     fillK(root,
       h('p', { class: 'lead' }, '雙眼睜開,右眼掃右眼、左眼掃左眼。掃動時看瞳孔裡的反射光:跟著光條走 = 順動(加正),反著走 = 逆動(減正),整個瞳孔亮起 = 中和。'),
-      h('div', { class: 'row wrap' }, segmented(EYES.map((e) => [e, EYE_LABEL[e]]), eye, (e) => { view.eye = e; game.setActiveEye(e); render(); })),
+      h('div', { class: 'row wrap' }, segmented(EYES.map((e) => [e, EYE_LABEL[e]]), eye, (e) => { view.eye = e; game.setActiveEye(e); render(); }), h('button', { class: 'b sm', type: 'button', onclick: () => ctx.openRetFocus?.() }, '⛶ 專注模式')),
       canvas,
       h('div', { class: 'row wrap' },
         h('span', { class: 'lab' }, '光條角度'),

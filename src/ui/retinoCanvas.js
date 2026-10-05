@@ -14,6 +14,7 @@ export class RetinoView {
     this.angle = 90; // 光條線的方向(度)
     this.auto = true;
     this.slow = false;
+    this.hintOn = game.mode !== 'exam'; // 顯示「順動/逆動」判讀(教學用)
     this.manualS = null;
     this.t = 0;
     this.last = performance.now();
@@ -116,17 +117,24 @@ export class RetinoView {
     }
     ctx.restore();
 
-    // 方向提示
+    // 方向提示(字放大,手機縮小後仍讀得到)
     ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.5;
-    ctx.font = '600 13px sans-serif';
-    ctx.beginPath(); ctx.moveTo(30, H - 34); ctx.lineTo(30 + ux * 34, H - 34 + uy * 34); ctx.stroke();
-    ctx.beginPath(); ctx.arc(30 + ux * 34, H - 34 + uy * 34, 3.5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillText(`光條 ${Math.round(this.angle)}° · 掃動方向 ${Math.round(info.sweepDir)}°`, 56, H - 26);
-    ctx.fillText(`${this.eye === 'OD' ? '右眼 OD' : '左眼 OS'}  工作距離 ${g.wdCm} cm`, W - 190, 22);
-    if (g.god) {
+    ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2;
+    ctx.font = '600 17px sans-serif';
+    ctx.beginPath(); ctx.moveTo(34, H - 36); ctx.lineTo(34 + ux * 38, H - 36 + uy * 38); ctx.stroke();
+    ctx.beginPath(); ctx.arc(34 + ux * 38, H - 36 + uy * 38, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillText(`光條 ${Math.round(this.angle)}° · 掃動 ${Math.round(info.sweepDir)}°`, 86, H - 28);
+    ctx.textAlign = 'right';
+    ctx.fillText(`${this.eye === 'OD' ? '右眼 OD' : '左眼 OS'} · ${g.wdCm} cm`, W - 14, 26);
+    ctx.textAlign = 'left';
+    if (this.hintOn) {
+      const txt = `${info.neutral ? '中和' : info.motion === 'with' ? '順動 → 加正' : '逆動 → 減正'}  (${info.r > 0 ? '+' : ''}${info.r.toFixed(2)}D)`;
+      ctx.font = '700 19px sans-serif';
+      const tw = ctx.measureText(txt).width + 24;
+      ctx.fillStyle = 'rgba(0,0,0,.55)';
+      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(10, 8, tw, 34, 17); else ctx.rect(10, 8, tw, 34); ctx.fill();
       ctx.fillStyle = info.neutral ? '#86e0a4' : info.motion === 'with' ? '#ffcf70' : '#8fd0ff';
-      ctx.fillText(`(提示) 此子午線殘餘 ${info.r > 0 ? '+' : ''}${info.r.toFixed(2)}D → ${{ neutral: '中和', with: '順動 → 加正', against: '逆動 → 減正' }[info.motion]}`, 14, 22);
+      ctx.fillText(txt, 22, 32);
     }
     ctx.restore();
   }

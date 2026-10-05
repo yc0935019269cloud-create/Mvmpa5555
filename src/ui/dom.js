@@ -19,8 +19,26 @@ export function h(tag, props = {}, ...kids) {
 
 export const clear = (el) => { while (el.firstChild) el.removeChild(el.firstChild); return el; };
 
-export function btn(label, onClick, { cls = '', title = '', disabled = false, aria } = {}) {
-  return h('button', { type: 'button', class: `b ${cls}`, onclick: onClick, title, disabled, 'aria-label': aria || undefined }, label);
+export function btn(label, onClick, { cls = '', title = '', disabled = false, aria, repeat = false } = {}) {
+  const el = h('button', { type: 'button', class: `b ${cls}`, onclick: onClick, title, disabled, 'aria-label': aria || undefined }, label);
+  if (repeat) holdRepeat(el, onClick);
+  return el;
+}
+
+// 長按連續觸發(只能用在「不會被重繪替換」的按鈕上)
+export function holdRepeat(el, fn, { delay = 380, every = 110 } = {}) {
+  let t = null, iv = null, held = false;
+  const stop = () => { clearTimeout(t); clearInterval(iv); t = iv = null; };
+  el.addEventListener('pointerdown', () => {
+    held = false;
+    stop();
+    t = setTimeout(() => { held = true; fn(); iv = setInterval(fn, every); }, delay);
+  });
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel', 'blur']) el.addEventListener(ev, stop);
+  // 長按觸發過就吃掉隨後的 click,避免多加一次
+  el.addEventListener('click', (e) => { if (held) { held = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
+  return stop;
 }
 
 export function segmented(options, value, onPick, cls = '') {

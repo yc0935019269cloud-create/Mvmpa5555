@@ -6,6 +6,8 @@ import { drawChart, CHART_W, CHART_H } from '../render/chartCanvas.js';
 import { ClinicScene } from '../render/scene.js';
 import { fmtRx } from '../sim/optics.js';
 import { faces } from './phoropterFace.js';
+import { buildQuickbar } from './quickbar.js';
+import { openRetFocus } from './retFocus.js';
 import {
   buildSetup, buildPhoro, buildRet, buildChartPanel, buildSheet, buildLog, buildHelp,
 } from './panels.js';
@@ -84,6 +86,8 @@ export class App {
   }
 
   teardown() {
+    this.rf?.close?.(false);
+    this.rf = null;
     this.scene?.dispose?.();
     this.scene = null;
     clearInterval(this.timerId);
@@ -115,6 +119,7 @@ export class App {
     this.deck = h('section', { id: 'deck' });
     this.tabsEl = h('div', { class: 'tabs', role: 'tablist' });
     this.deckBody = h('div', { class: 'deckbody' });
+    this.quick = null;
     this.deck.append(this.tabsEl, this.deckBody);
     const app = (this.appEl = h('div', { id: 'app' }, stage, this.deck));
     this.root.replaceChildren(app);
@@ -130,7 +135,7 @@ export class App {
       this.scene = new FlatScene(glwrap);
     }
 
-    const ctx = { toast: (t, warn) => this.toast(t, warn), ask: (fn) => this.ask(fn) };
+    const ctx = { toast: (t, warn) => this.toast(t, warn), ask: (fn) => this.ask(fn), showTab: (t) => this.showTab(t), openRetFocus: () => this.openFocus() };
     this.ctx = ctx;
     this.panels = {
       setup: buildSetup(game, ctx),
@@ -141,6 +146,11 @@ export class App {
       log: buildLog(game),
       help: buildHelp(),
     };
+    this.quick = buildQuickbar(game, ctx);
+    this.deck.append(this.quick.el);
+    this.appEl.dataset.deck = 'm';
+    this.deckPref = null;
+    this.rfDismissed = false;
     this.unsub = game.on((kind) => this.onGame(kind));
     this.renderTabs();
     this.renderStations();
@@ -160,6 +170,7 @@ export class App {
     if (kind === 'slider') return;
     if (window.__pfDrag) { for (const f of faces) f.update(); return; } // 旋鈕拖曳中:只更新驗光儀,放開後再整體刷新
     this.repaintChart();
+    this.quick?.render();
     if (kind === 'log') {
       const m = g.log[g.log.length - 1];
       if (m.who === 'patient') { this.showBubble('patient', g.patient.name, m.text); this.scene?.pulseSpeak(); }
@@ -182,7 +193,8 @@ export class App {
     const id = g.stepDef.phase ?? g.stepId;
     const want = { setup: 'setup', ret: 'ret', wd: 'phoro', va: 'phoro', mp1: 'phoro', duo: 'phoro', jcc: 'phoro', mp2: 'phoro', done: 'phoro' }[id];
     if (g.stepId === 'done') { setTimeout(() => this.showResult(), 500); return; }
-    if (want && want !== this.tab) this.showTab(want);
+    if (id === 'ret') this.rfDismissed = false;
+    if (want && (want !== this.tab || (want === 'ret' && !this.rf))) this.showTab(want);
     if (id === 'duo') { g.setAux(g.activeEye, 'RG'); g.setChart({ mode: 'digits', isolate: true }); }
     if (id === 'jcc') g.setChart({ mode: 'honey' });
     if (id === 'mp1' || id === 'mp2' || id === 'va') g.setChart({ mode: 'digits', isolate: true, row: id === 'va' ? 0.6 : g.chart.row });
@@ -296,7 +308,7 @@ export class App {
     this.tabsEl.replaceChildren(
       ...tabs.map((t) => h('button', { type: 'button', role: 'tab', class: this.tab === t ? 'on' : '', 'aria-selected': this.tab === t ? 'true' : 'false', onclick: () => { this.showTab(t); } }, TAB_LABEL[t])),
       h('span', { class: 'grow' }),
-      h('button', { type: 'button', class: 'fold', 'aria-label': '收合/展開操作台', onclick: () => { this.appEl.classList.toggle('collapsed'); } }, '⇕'),
+      h('button', { type: 'button', class: 'fold', 'aria-label': '收合/展開操作台', onclick: () => this.cycleDeck() }, '⇕'),
     );
   }
 
@@ -309,8 +321,30 @@ export class App {
     this.deckBody.replaceChildren(p.el);
     this.deckBody.scrollTop = 0;
     p.onShow?.();
-    this.appEl.classList.remove('collapsed');
+    this.applyDeck(tab);
+    this.quick?.render();
+    if (tab === 'ret' && this.isSmall() && !this.rf && !this.rfDismissed) this.openFocus();
     if (moveCamera) { this.scene.goTo(STATION_FOR_TAB[tab] ?? 'overview'); this.renderStations(); }
+  }
+
+  isSmall() { return window.matchMedia('(max-width: 700px), (max-height: 520px)').matches; }
+
+  applyDeck(tab = this.tab) {
+    this.appEl.dataset.deck = tab === 'ret' ? 'l' : this.deckPref ?? 'm';
+  }
+
+  cycleDeck() {
+    const order = ['m', 'l', 's'];
+    const cur = this.appEl.dataset.deck;
+    const next = order[(order.indexOf(cur) + 1) % order.length];
+    this.deckPref = next;
+    this.appEl.dataset.deck = next;
+    this.appEl.classList.toggle('collapsed', next === 's');
+  }
+
+  openFocus() {
+    if (this.rf) return;
+    this.rf = openRetFocus(this.game, this.ctx, { onClose: (manual) => { this.rf = null; if (manual) this.rfDismissed = true; } });
   }
 
   hotspot(id) {
