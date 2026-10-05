@@ -179,4 +179,30 @@ t('輔助鏡:稜鏡擋住比較;+.12 讓球面多 0.12D', () => {
   near(g.lensVec('OD').M - toVec(g.lens('OD')).M, 0.12);
 });
 
+console.log('step conditions');
+t('過關清單:前置 9 項,做完就全部打勾,check() 與清單一致', () => {
+  const g = new Game({ mode: 'tutorial', seed: 5 });
+  let c = g.conditions();
+  assert.equal(c.length, 9);
+  assert.equal(g.check().why.length, c.filter((x) => !x.ok).length);
+  g.sanitize(); g.measurePD(); g.setPD(g.patient.pd); g.setLevel(0); g.setAux('OD', 'O'); g.setAux('OS', 'O');
+  g.setAperture(true); g.setHeight(0.5); g.setChart({ mode: 'big_e' }); g.setLocked(true); g.setDim(true);
+  c = g.conditions();
+  assert.ok(c.every((x) => x.ok));
+  assert.ok(g.check().ok);
+});
+t('VA:讀視標的紀錄帶有步驟與鏡片,改鏡片後就不算「目前鏡片」', () => {
+  const g = new Game({ mode: 'tutorial', seed: 5 });
+  g.step = 3; // OD.va
+  g.setTestEye('OD');
+  g.setChart({ mode: 'digits', row: 0.6, isolate: true });
+  g.askRead();
+  const r = g.hist.OD.reads.at(-1);
+  assert.equal(r.step, 'OD.va');
+  assert.equal(r.lens, g.lensKey('OD'));
+  g.stepSph('OD', 0.25);
+  assert.notEqual(r.lens, g.lensKey('OD'));
+  assert.ok(g.conditions()[0].ok, '已在只開 OD 的情況下讀過視標');
+});
+
 console.log(`\n${passed} passed`);
