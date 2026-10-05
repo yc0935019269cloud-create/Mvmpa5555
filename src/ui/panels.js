@@ -57,7 +57,7 @@ export function buildSetup(game, ctx) {
     const P = game.phoro;
     const row = (id, label, controls, note) => {
       const ok = st[id];
-      return h('div', { class: `chk${ok ? ' ok' : ''}`, 'data-id': id },
+      return h('div', { class: `chk${ok ? ' ok' : ''}`, 'data-id': id, 'data-coach': `setup:${id}` },
         h('div', { class: 'chk-h' }, h('span', { class: 'mark', 'aria-hidden': 'true' }, ok ? '✓' : '○'), h('b', {}, label)),
         h('div', { class: 'chk-b' }, controls, note ? h('p', { class: 'note' }, note) : null));
     };
@@ -99,7 +99,7 @@ export function buildSetup(game, ctx) {
           (out2 = h('output', {}, heightTxt)))),
       row('chart', '視標切成紅綠大 E(或 20/400)',
         h('div', { class: 'row wrap' }, btn('紅綠大 E', () => game.setChart({ mode: 'big_e' }), { cls: game.chart.mode === 'big_e' ? 'on' : '' }),
-          btn('數字視標', () => game.setChart({ mode: 'digits' }), { cls: game.chart.mode === 'digits' ? 'on' : '' }))),
+          btn('E 字視標', () => game.setChart({ mode: 'tumble' }), { cls: game.chart.mode === 'tumble' ? 'on' : '' }))),
       row('lock', '綜合驗光儀鎖緊,受測者額頭輕靠',
         btn(P.locked ? '已鎖緊(按一下放鬆)' : '鎖緊', () => game.setLocked(!P.locked))),
       row('dim', '室內燈光微暗',
@@ -213,7 +213,7 @@ export function readsNow(game, eye) {
   const key = game.lensKey(eye);
   return game.hist[eye].reads.filter((r) => r.step === game.stepId && r.lens === key && r.isolated);
 }
-function guessVA(list) {
+export function guessVA(list) {
   const full = list.filter((r) => r.correct === r.total).map((r) => r.row);
   if (!full.length) return null;
   const row = Math.max(...full);
@@ -281,7 +281,7 @@ export function buildPhoro(game, ctx) {
         h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked: game.autoComp, onchange: (e) => game.setAutoComp(e.target.checked) }),
           h('span', {}, '改散光時自動補償球面(每 −0.50DC 補 +0.25DS)'))),
       section('③ 視標(遠方 6 m)',
-        h('div', { class: 'row wrap' }, segmented([['digits', '數字'], ['rg', '紅綠'], ['honey', '蜂巢'], ['clock', '鐘面圖'], ['big_e', '大 E']], game.chart.mode, (m) => game.setChart({ mode: m }))),
+        h('div', { class: 'row wrap' }, segmented([['tumble', 'E 字'], ['rg', '紅綠'], ['honey', '蜂巢'], ['clock', '鐘面圖'], ['big_e', '大 E']], game.chart.mode, (m) => game.setChart({ mode: m }))),
         h('div', { class: 'row wrap' },
           h('span', { class: 'lab' }, '視力列'),
           btn('◀ 大', () => game.stepRow(-1), { cls: 'sm' }),
@@ -318,11 +318,13 @@ function pathPicker(game) {
 export function wdButtons(game, toast, cls = '') {
   const S = game.sheet;
   const done = (e) => S.slots.ret[e] && game.lensKey(e) === rxKey(S.slots.ret[e].rx);
-  return [
+  const bs = [
     btn(game.wdApplied ? `✓ 已進工作距離 −${game.wdD.toFixed(2)}D` : `① 雙眼給工作距離 −${game.wdD.toFixed(2)}D`, () => game.applyWD(), { cls: `${cls} ${game.wdApplied ? 'on' : 'primary'}`, disabled: game.wdApplied }),
     ...EYES.map((e) => btn(done(e) ? `✓ ${e} 已記錄` : `② 記錄 ${e} 度數`, () => { game.recordRx('ret', e); toast(`已記錄 ${e}:${fmtRx(game.lens(e))}`); }, { cls: `${cls} ${done(e) ? 'on' : ''}` })),
     btn(S.wdCm === game.wdCm ? `✓ 工作距離 ${game.wdCm} cm` : `③ 記錄工作距離 ${game.wdCm} cm`, () => { game.recordWD(game.wdCm); toast('已記錄工作距離'); }, { cls: `${cls} ${S.wdCm === game.wdCm ? 'on' : ''}` }),
   ];
+  bs.forEach((b, i) => b.setAttribute('data-coach', i === 0 ? 'wd' : 'rec'));
+  return bs;
 }
 
 function wdRecord(game) {
@@ -392,7 +394,7 @@ export function buildChartPanel(game, ctx) {
         h('figure', {}, previewCanvas, h('figcaption', {}, '視標畫面')),
         game.mode !== 'exam' ? h('figure', {}, patientCanvas, h('figcaption', {}, '受測者視野(模擬模糊)')) : null),
       h('div', { class: 'row wrap' },
-        segmented([['digits', '數字'], ['rg', '紅綠'], ['honey', '蜂巢'], ['clock', '鐘面圖'], ['big_e', '大 E']], game.chart.mode, (m) => game.setChart({ mode: m }))),
+        segmented([['tumble', 'E 字'], ['rg', '紅綠'], ['honey', '蜂巢'], ['clock', '鐘面圖'], ['big_e', '大 E']], game.chart.mode, (m) => game.setChart({ mode: m }))),
       h('div', { class: 'row wrap' },
         btn('◀ 大', () => game.stepRow(-1), { cls: 'sm' }),
         h('output', { class: 'val' }, `${game.chart.row.toFixed(1)} · ${snellen(game.chart.row)}`),
@@ -406,27 +408,30 @@ export function buildChartPanel(game, ctx) {
     drawChart(previewCanvas.getContext('2d'), game.chart, game.patient.seed);
     if (game.mode !== 'exam') paintPatient();
   }
-  function paintPatient() {
-    const eyes = game.openEyes();
-    const tmp = ctx.tmpCanvas ?? (ctx.tmpCanvas = document.createElement('canvas'));
-    tmp.width = patientCanvas.width; tmp.height = patientCanvas.height;
-    const t2 = tmp.getContext('2d');
-    // 先把視標縮小畫進暫存畫布
-    const full = ctx.fullCanvas ?? (ctx.fullCanvas = document.createElement('canvas'));
-    full.width = CHART_W; full.height = CHART_H;
-    drawChart(full.getContext('2d'), game.chart, game.patient.seed, { patientView: clockView(game) });
-    t2.clearRect(0, 0, tmp.width, tmp.height);
-    t2.drawImage(full, 0, 0, tmp.width, tmp.height);
-    if (!eyes.length) {
-      const c = patientCanvas.getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, patientCanvas.width, patientCanvas.height);
-      c.fillStyle = '#9aa'; c.font = '14px sans-serif'; c.fillText('兩眼都被遮住', 90, 120); return;
-    }
-    const e = game.activeEye && !game.phoro.occ[game.activeEye] ? game.activeEye : eyes[0];
-    const v = visionOf(game, e);
-    drawBlurred(patientCanvas, tmp, { ...v, kPx: 14 });
-  }
+  function paintPatient() { paintPatientView(game, ctx, patientCanvas); }
   render();
   return { el: root, render, paint };
+}
+
+// 「受測者視野」:把視標依目前的殘餘屈光不正模糊化(檢影台 / 驗光台工作台共用)
+export function paintPatientView(game, ctx, patientCanvas) {
+  const eyes = game.openEyes();
+  const tmp = ctx.tmpCanvas ?? (ctx.tmpCanvas = document.createElement('canvas'));
+  tmp.width = patientCanvas.width; tmp.height = patientCanvas.height;
+  const t2 = tmp.getContext('2d');
+  // 先把視標縮小畫進暫存畫布
+  const full = ctx.fullCanvas ?? (ctx.fullCanvas = document.createElement('canvas'));
+  full.width = CHART_W; full.height = CHART_H;
+  drawChart(full.getContext('2d'), game.chart, game.patient.seed, { patientView: clockView(game) });
+  t2.clearRect(0, 0, tmp.width, tmp.height);
+  t2.drawImage(full, 0, 0, tmp.width, tmp.height);
+  if (!eyes.length) {
+    const c = patientCanvas.getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, patientCanvas.width, patientCanvas.height);
+    c.fillStyle = '#9aa'; c.font = '14px sans-serif'; c.fillText('兩眼都被遮住', 90, 120); return;
+  }
+  const e = game.activeEye && !game.phoro.occ[game.activeEye] ? game.activeEye : eyes[0];
+  const v = visionOf(game, e);
+  drawBlurred(patientCanvas, tmp, { ...v, kPx: 14 * (patientCanvas.width / 300) });
 }
 
 export function visionOf(game, eye) {

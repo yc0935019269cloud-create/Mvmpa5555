@@ -8,6 +8,7 @@ import {
 } from '../sim/patient.js';
 import { fullyNeutral, wdDiopter } from '../sim/retino.js';
 import { makeRng } from '../sim/rng.js';
+import { optosFor, E_DIRS } from '../render/chartCanvas.js';
 
 export const EYES = ['OD', 'OS'];
 export const other = (e) => (e === 'OD' ? 'OS' : 'OD');
@@ -76,7 +77,7 @@ export class Game {
       height: 0.25, // 0~1,0.5 附近才算與驗光師等高
     };
     this.room = { dim: false, sanitized: false };
-    this.chart = { mode: 'digits', row: 0.6, isolate: true };
+    this.chart = { mode: 'tumble', row: 0.6, isolate: true };
     this.sheet = {
       wdCm: null,
       pd: null,
@@ -265,14 +266,16 @@ export class Game {
   askRead() {
     const open = this.openEyes();
     if (!open.length) { this.say('patient', '咦?我什麼都看不到,兩邊都被擋住了。'); return null; }
-    if (this.chart.mode !== 'digits' && this.chart.mode !== 'rg') { this.say('patient', '這個圖案不是數字耶,我沒辦法讀。'); return null; }
+    if (this.chart.mode !== 'tumble' && this.chart.mode !== 'rg') { this.say('patient', '這個圖案要怎麼讀?要換成 E 字視標我才能說方向。'); return null; }
     if (this.prismBlock(open)) return null;
     const lm = this.seenLogMAR(open);
     const row = this.chart.row;
     const { correct, total } = readRow(this.patient, lm, row);
     const isolated = open.length === 1 && open[0] === this.activeEye;
-    const digits = this.chartDigits(row);
-    const shown = digits.map((d, i) => (i < correct ? d : (d + 3) % 10)).join(' ');
+    // E 字視標:受測者說出每個 E 的缺口方向;看不清楚的會說錯或猶豫
+    const dirs = this.chartOptos(row);
+    const said = dirs.map((d, i) => (i < correct ? E_DIRS[d] : E_DIRS[(d + 1 + (i % 3)) % 4]));
+    const shown = said.join('、');
     let txt;
     if (correct === total) txt = `${shown}。`;
     else if (correct === 0) txt = '這一排太小了,看不太到…';
@@ -284,11 +287,7 @@ export class Game {
     return { correct, total, row };
   }
 
-  chartDigits(row) {
-    const r = makeRng(Math.round(row * 100) * 131 + this.seed);
-    const n = rowCount(row);
-    return Array.from({ length: n }, () => r.int(0, 9));
-  }
+  chartOptos(row) { return optosFor(this.seed, row); }
 
   // 兩片比較:鏡片1=現在,鏡片2=現在+dir(球面)
   askCompare(dir) {
@@ -301,6 +300,12 @@ export class Game {
     const ans = compareLenses(this.patient, eye, l1, l2, 'va', { pinhole });
     this.say('you', `鏡片 1(現在) ↔ 鏡片 2(${dir > 0 ? '+' : '−'}0.25D):哪個比較清楚?`);
     this.say('patient', `「${say(this.patient, ans)}」`);
+    if (this.mode !== 'exam') {
+      const lens2 = dir < 0 ? '加負' : '退負(加正)';
+      this.say('sys', ans === 'second' ? `(提示)第 2 片(${lens2})比較清楚 → 可以給這 ${dir < 0 ? '−' : '+'}0.25。`
+        : ans === 'first' ? '(提示)第 1 片(現在)比較清楚 → 維持現在的度數。'
+          : `(提示)一樣清楚 → ${dir < 0 ? '不給這 −0.25(最大正度數)' : '可以退這 +0.25(一樣清楚就給比較正的)'}。`);
+    }
     this.hist[eye].compares++;
     this.ev('compare', { eye, dir, ans, dM: this.dM(eye) });
     this.emit();
@@ -312,10 +317,11 @@ export class Game {
     const usingRG = this.phoro[eye].aux === 'RG' || this.chart.mode === 'rg';
     if (this.phoro.occ[eye]) { this.say('patient', '這隻眼睛被遮住了,我看不到。'); return null; }
     if (this.prismBlock([eye])) return null;
-    if (!usingRG) { this.say('patient', '我看到的就是黑白數字,沒有紅綠耶。'); return null; }
+    if (!usingRG) { this.say('patient', '我看到的就是黑白的 E,沒有紅綠耶。'); return null; }
     const ans = duochrome(this.patient, eye, this.lensVec(eye));
     this.say('you', '請比較綠色邊與紅色邊,哪一邊的字比較清晰?');
     this.say('patient', `「${say(this.patient, ans)}」`);
+    if (this.mode !== 'exam') this.say('sys', ans === 'red' ? '(提示)紅色清楚 = 度數偏正 → 加 −0.25 再問。' : ans === 'green' ? '(提示)綠色清楚 → 到終點了(綠色第一片清楚)。' : '(提示)兩邊一樣 → 到終點了。');
     this.hist[eye].duo.push({ ans, dM: this.dM(eye), t: Date.now() });
     this.ev('duo', { eye, ans, dM: this.dM(eye) });
     this.emit();
@@ -329,7 +335,7 @@ export class Game {
     if (mode === 'off') { this.say('patient', '(還沒有放上 JCC)'); return null; }
     if (this.phoro.occ[eye]) { this.say('patient', '這隻眼睛被遮住了,我看不到。'); return null; }
     if (this.prismBlock([eye])) return null;
-    if (this.chart.mode !== 'digits' && this.chart.mode !== 'honey') { this.say('patient', '這個圖案不適合比較 JCC,請換成蜂巢或數字視標。'); return null; }
+    if (this.chart.mode !== 'tumble' && this.chart.mode !== 'honey') { this.say('patient', '這個圖案不適合比較 JCC,請換成蜂巢或 E 字視標。'); return null; }
     const a = this.phoro[eye].a;
     const base = toVec(this.lens(eye));
     const r1 = jccRedAxis(mode, 1, a), r2 = jccRedAxis(mode, 2, a);

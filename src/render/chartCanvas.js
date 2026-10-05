@@ -10,19 +10,35 @@ const RED = '#c8372d';
 const GREEN = '#1f9a55';
 const FONT = '"Arial Black","Helvetica Neue",Arial,sans-serif';
 
-export function digitsFor(seed, row) {
+// E 字視標的缺口方向:0 右、1 上、2 左、3 下
+export const E_DIRS = ['右', '上', '左', '下'];
+export function optosFor(seed, row) {
   const r = makeRng(Math.round(row * 100) * 131 + seed);
-  return Array.from({ length: rowCount(row) }, () => r.int(0, 9));
+  const out = [];
+  for (let i = 0; i < rowCount(row); i++) {
+    let d = r.int(0, 3);
+    if (i > 0 && d === out[i - 1]) d = (d + 1 + r.int(0, 2)) % 4; // 相鄰不重複,比較像真的視力表
+    out.push(d);
+  }
+  return out;
 }
 
-function drawDigitRow(ctx, cx, cy, h, digits, color = '#111') {
+// 一個 E:5 × 5 格,筆畫粗 = 字高 / 5(Snellen 規格),預設缺口朝右
+export function drawE(ctx, x, y, h, dir, color = '#111') {
+  const u = h / 5;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate([0, -Math.PI / 2, Math.PI, Math.PI / 2][dir]);
   ctx.fillStyle = color;
-  ctx.font = `900 ${h * 1.28}px ${FONT}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const gap = h * 1.08;
-  const x0 = cx - ((digits.length - 1) * gap) / 2;
-  digits.forEach((d, i) => ctx.fillText(String(d), x0 + i * gap, cy + h * 0.06));
+  ctx.fillRect(-2.5 * u, -2.5 * u, u, 5 * u);
+  for (const k of [0, 2, 4]) ctx.fillRect(-2.5 * u, (-2.5 + k) * u, 5 * u, u);
+  ctx.restore();
+}
+
+function drawERow(ctx, cx, cy, h, dirs, color = '#111') {
+  const gap = h * 2; // 字與字之間空一個字寬
+  const x0 = cx - ((dirs.length - 1) * gap) / 2;
+  dirs.forEach((d, i) => drawE(ctx, x0 + i * gap, cy, h, d, color));
 }
 
 // 以 1.0 列字高 = 24px 為基準(大小 ∝ 1/VA)
@@ -45,7 +61,7 @@ export function drawChart(ctx, chart, seed, { W = CHART_W, H = CHART_H, patientV
     ctx.font = `700 22px sans-serif`;
     ctx.fillStyle = '#fff';
     ctx.fillText('20/400', cx, H - 26);
-  } else if (mode === 'digits' || mode === 'rg') {
+  } else if (mode === 'tumble' || mode === 'rg') {
     if (mode === 'rg') {
       ctx.fillStyle = RED; ctx.fillRect(0, 0, W / 2, H);
       ctx.fillStyle = GREEN; ctx.fillRect(W / 2, 0, W / 2, H);
@@ -53,14 +69,15 @@ export function drawChart(ctx, chart, seed, { W = CHART_W, H = CHART_H, patientV
     const rows = chart.isolate ? [chart.row] : VA_ROWS;
     // 版面:總高度分配
     const sumH = rows.reduce((s, r) => s + baseH(r) * 1.28 + 14, 0);
-    const scale = chart.isolate ? Math.min(1.9, (H * 0.6) / (baseH(chart.row) * 1.28)) : (H - 60) / sumH;
+    // 單列:放大但不超出畫面寬(一列 n 個 E 佔 2n−1 個字寬)
+    const scale = chart.isolate ? Math.min(1.9, (H * 0.6) / (baseH(chart.row) * 1.28), (W * 0.88) / (baseH(chart.row) * (2 * rowCount(chart.row) - 1))) : (H - 60) / sumH;
     let y = chart.isolate ? H / 2 : 30;
     for (const r of rows) {
       const h = baseH(r) * scale;
       const rowH = h * 1.28 + 14 * scale;
       const cy = chart.isolate ? y : y + rowH / 2;
-      // 在紅綠視標上整列加黑字
-      drawDigitRow(ctx, cx, cy, h, digitsFor(seed, r), mode === 'rg' ? '#050505' : '#111');
+      // 紅綠視標上也是黑色 E
+      drawERow(ctx, cx, cy, h, optosFor(seed, r), mode === 'rg' ? '#050505' : '#111');
       if (!chart.isolate) {
         ctx.font = '600 13px sans-serif';
         ctx.textAlign = 'left'; ctx.textBaseline = 'middle';

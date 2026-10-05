@@ -53,7 +53,12 @@ export class PhoropterFace {
     this._raf = requestAnimationFrame(() => { this._raf = 0; this.render(); });
   }
   updateNow() { cancelAnimationFrame(this._raf); this._raf = 0; this.render(); }
-  render() { this.svgHost.innerHTML = faceSVG(this.game); this.layoutRetino(); }
+  render() {
+    this.svgHost.innerHTML = faceSVG(this.game);
+    // 教學模式:要轉的那顆旋鈕發光
+    if (this.coachSel) for (const el of this.svgHost.querySelectorAll(this.coachSel)) el.classList.add('coach-hl');
+    this.layoutRetino();
+  }
   destroy() { faces.delete(this); cancelAnimationFrame(this._raf); this.detachRetino(); }
 
   // 把檢影畫面(光帶、瞳孔反射)畫進左右兩個窺孔裡:像真的從驗光儀看病人的眼睛

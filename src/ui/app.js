@@ -1,13 +1,16 @@
 // 應用程式:主選單 → 遊戲(3D 舞台 + 操作台)→ 結果
 import { h, btn, segmented } from './dom.js';
-import { Game, STEPS, EYES, EYE_LABEL } from '../game/state.js';
+import { Game, STEPS, EYES, EYE_LABEL, other } from '../game/state.js';
+import { coachSteps } from '../game/coach.js';
 import { score, summarizeEyes } from '../game/scoring.js';
 import { drawChart, CHART_W, CHART_H } from '../render/chartCanvas.js';
 import { ClinicScene } from '../render/scene.js';
 import { fmtRx } from '../sim/optics.js';
 import { faces } from './phoropterFace.js';
-import { buildQuickbar, openRecordSheet, recordDone, mainAsk, cycleJcc } from './quickbar.js';
-import { fx, tick } from './feedback.js';
+import { buildQuickbar, recordDone, mainAsk, cycleJcc } from './quickbar.js';
+import { fx, tick, speak } from './feedback.js';
+import { openPaper } from './paper.js';
+import { openBench } from './bench.js';
 import { openRetFocus } from './retFocus.js';
 import {
   buildSetup, buildPhoro, buildRet, buildChartPanel, buildSheet, buildLog, buildHelp,
@@ -15,7 +18,11 @@ import {
 
 const fill = (el, ...kids) => { el.replaceChildren(...kids.flat(Infinity).filter((k) => k !== null && k !== undefined && k !== false)); return el; };
 const BEST_KEY = 'optom3d-best-v1';
-const GUIDE_KEY = 'optom3d-guide-v1';
+const GUIDE_KEY = 'optom3d-guide-v2';
+const LAYOUT_KEY = 'optom3d-layout-v1';
+const layoutPref = () => { try { return localStorage.getItem(LAYOUT_KEY); } catch { return null; } };
+// 電腦版(大螢幕 + 滑鼠)預設用沉浸式第一人稱版面
+const canImm = () => window.matchMedia('(min-width: 1100px) and (min-height: 620px) and (pointer: fine)').matches;
 const loadBest = () => { try { return JSON.parse(localStorage.getItem(BEST_KEY) || '{}'); } catch { return {}; } };
 const saveBest = (mode, s) => { try { const b = loadBest(); if (!b[mode] || s > b[mode]) { b[mode] = s; localStorage.setItem(BEST_KEY, JSON.stringify(b)); return true; } } catch { /* ignore */ } return false; };
 
@@ -92,7 +99,12 @@ export class App {
     this.rf = null;
     this.recClose?.();
     this.recClose = null;
+    this.bench?.close(false);
+    this.bench = null;
+    try { speechSynthesis.cancel(); } catch { /* ignore */ }
     if (this.onKey) { document.removeEventListener('keydown', this.onKey); document.removeEventListener('pointerdown', this.onPtr, true); this.onKey = null; }
+    this.menuEl?.remove();
+    this.menuOpen = false;
     this.scene?.dispose?.();
     this.scene = null;
     clearInterval(this.timerId);
@@ -127,6 +139,8 @@ export class App {
     this.quick = null;
     this.deck.append(this.tabsEl, this.deckBody);
     const app = (this.appEl = h('div', { id: 'app' }, stage, this.deck));
+    this.imm = canImm() && layoutPref() !== 'classic';
+    app.classList.toggle('imm', this.imm);
     this.root.replaceChildren(app);
 
     this.toastEl = h('div', { class: 'toast', role: 'status' });
@@ -134,13 +148,14 @@ export class App {
 
     try {
       this.scene = new ClinicScene(glwrap, game, this.chartCanvas, { onHotspot: (id) => this.hotspot(id) });
+      this.scene.onFrame = () => this.placeBubble();
     } catch (err) {
       // 沒有 WebGL 時退回純 2D 操作(仍可完整練習)
       console.warn('WebGL 不可用,改用 2D 模式', err);
       this.scene = new FlatScene(glwrap);
     }
 
-    const ctx = { toast: (t, warn) => this.toast(t, warn), ask: (fn) => this.ask(fn), showTab: (t) => this.showTab(t), openRetFocus: () => this.openFocus(), openRecord: () => this.openRecord() };
+    const ctx = { toast: (t, warn) => this.toast(t, warn), ask: (fn) => this.ask(fn), showTab: (t) => this.showTab(t), openRetFocus: () => this.openFocus(), openRecord: () => this.openRecord(), applyCoach: () => this.applyCoach() };
     this.ctx = ctx;
     this.panels = {
       setup: buildSetup(game, ctx),
@@ -156,6 +171,7 @@ export class App {
     this.appEl.dataset.deck = 'm';
     this.deckPref = null;
     this.rfDismissed = false;
+    this.benchDismissed = false;
     this.unsub = game.on((kind) => this.onGame(kind));
     this.renderTabs();
     this.renderStations();
@@ -182,8 +198,11 @@ export class App {
     const ov = h('div', { class: 'overlay glass guide' }, h('div', { class: 'card small' },
       h('h2', {}, '30 秒上手'),
       h('ol', { class: 'guide-list' },
-        h('li', {}, h('b', {}, '左上角步驟卡'), ':告訴你這一步要做什麼,清單全部打勾 ✓ 就按「完成此步驟」。'),
-        h('li', {}, h('b', {}, '黃色熱點 / 下方視角列'), ':點 3D 診間裡的儀器就能操作;拖曳畫面可以左右看。'),
+        h('li', {}, h('b', {}, '教練卡(左上)'), ':把每一步拆成小動作,▶ 是現在要做的事,要按的地方會發黃光;做到自動打勾 ✓,全部完成按「完成此步驟」。'),
+        this.imm
+          ? h('li', {}, h('b', {}, '你坐在驗光師的位子'), ':拖曳畫面轉頭(滾輪拉近),底下的工具列可以打開驗光台、檢影鏡、紀錄單,或轉身看 6 m 外的視力表。')
+          : h('li', {}, h('b', {}, '黃色熱點 / 下方視角列'), ':點 3D 診間裡的儀器就能操作;拖曳畫面可以左右看。'),
+        this.imm ? h('li', {}, h('b', {}, '驗光台'), ':左邊是大的綜合驗光儀,右邊是投影在視力表上的 E 字視標與遙控器,受測者的回答會出現在視標下方。') : null,
         h('li', {}, h('b', {}, '綜合驗光儀'), touch ? ':用手指轉旋鈕,或點旋鈕左半(−)/右半(+)。' : ':拖曳旋鈕轉動、點左半(−)/右半(+),滑鼠滾輪也可以。'),
         h('li', {}, h('b', {}, '底部常用操作列'), ':遮眼、問受測者、調度數、記錄都在這裡,受測者的回答也會顯示在上面。'),
         touch ? null : h('li', {}, h('b', {}, '鍵盤'), ':空白鍵 = 問受測者,←→ = 球面 ±0.25,↑↓ = 視標大小,Enter = 完成此步驟(其餘見「速查」)。')),
@@ -193,8 +212,49 @@ export class App {
 
   openRecord() {
     this.recClose?.();
-    const close = openRecordSheet(this.game);
+    const close = openPaper(this.game, { toast: (t) => this.toast(t), onClose: () => { this.recClose = null; this.renderStations(); } });
     this.recClose = () => { close(); this.recClose = null; };
+    this.renderStations();
+  }
+
+  // 驗光台工作台(電腦版沉浸式):步驟卡搬進工作台左上角當教練
+  openBench() {
+    if (this.bench) return;
+    const slot = h('div', { class: 'coachslot' }, this.stepcard);
+    this.scene.goTo('phoro');
+    this.bench = openBench(this.game, this.ctx, {
+      coachSlot: slot,
+      onClose: (manual) => {
+        this.bench = null;
+        this.stage.insertBefore(this.stepcard, this.bubble);
+        if (manual) this.benchDismissed = true;
+        this.renderStations();
+      },
+    });
+    this.renderStations();
+    this.applyCoach();
+  }
+
+  // 受測者的話泡泡跟著 3D 裡受測者的頭
+  placeBubble() {
+    const b = this.bubble;
+    if (!this.imm || !b.classList.contains('on') || b.classList.contains('sys') || !this.scene?.screenPos) { b.classList.remove('athead'); b.style.left = b.style.top = ''; return; }
+    const p = this.scene.screenPos(0, 1.43, 0.17);
+    if (!p) { b.classList.remove('athead'); b.style.left = b.style.top = ''; return; }
+    b.classList.add('athead');
+    b.style.left = `${Math.max(140, Math.min(this.stage.clientWidth - 140, p.x))}px`;
+    b.style.top = `${Math.max(110, p.y)}px`;
+  }
+
+  // 教學模式:現在要做的那一步,把對應的按鈕 / 旋鈕點亮
+  applyCoach() {
+    const g = this.game;
+    const tgt = g?.mode === 'tutorial' ? this.coachTarget : null;
+    for (const el of document.querySelectorAll('.coach-hl')) if (el.dataset.coach !== tgt) el.classList.remove('coach-hl');
+    if (tgt) for (const el of document.querySelectorAll(`[data-coach="${tgt}"]`)) el.classList.add('coach-hl');
+    const eye = g?.activeEye ?? 'OD';
+    const knob = { fog: `[data-k="wheel"][data-e="${eye}"]`, sphM: `[data-k="wheel"][data-e="${eye}"]`, occ: `[data-k="occ"][data-e="${other(eye)}"]`, ph: `[data-k="aux"][data-e="${eye}"]`, rg: `[data-k="aux"][data-e="${eye}"]`, jcc: `[data-k="jcc"][data-e="${eye}"]`, 'setup:pd': '[data-k="pd"]', 'setup:level': '[data-k="level"]', 'setup:aux': '[data-k="aux"]', 'setup:aperture': '[data-k="occ"]' }[tgt] ?? null;
+    for (const f of faces) if (f.coachSel !== knob) { f.coachSel = knob; f.update(); }
   }
 
   // 驗光儀的鏡片 / 輔助鏡 / JCC 狀態:變了就「喀」一聲
@@ -231,7 +291,7 @@ export class App {
       case '-': run(() => g.stepCyl(eye, -0.25)); break;
       case '=': case '+': run(() => g.stepCyl(eye, 0.25)); break;
       case 'o': case 'O': run(() => g.setTestEye(eye)); break;
-      case 'r': case 'R': if (recordDone(g) !== null) run(() => this.openRecord()); break; // 紅綠步驟沒有要記錄的
+      case 'r': case 'R': if (recordDone(g) !== null || g.stepId === 'wd') run(() => this.openRecord()); break; // 紅綠步驟沒有要記錄的
       case 'Enter': run(() => this.tryAdvance()); break;
       default: break;
     }
@@ -249,7 +309,7 @@ export class App {
     this.quick?.render();
     if (kind === 'log') {
       const m = g.log[g.log.length - 1];
-      if (m.who === 'patient') { this.showBubble('patient', g.patient.name, m.text); this.scene?.pulseSpeak(); }
+      if (m.who === 'patient') { this.showBubble('patient', g.patient.name, m.text); this.scene?.pulseSpeak(); speak(m.text); }
       else if (m.who === 'sys') this.showBubble('sys', '系統', m.text);
       this.panels.log.render();
       return;
@@ -262,6 +322,7 @@ export class App {
     if (kind === 'step') {
       this.onStepChange();
     }
+    this.applyCoach();
   }
 
   onStepChange() {
@@ -269,12 +330,18 @@ export class App {
     const id = g.stepDef.phase ?? g.stepId;
     const want = { setup: 'setup', ret: 'ret', wd: 'phoro', va: 'phoro', mp1: 'phoro', duo: 'phoro', jcc: 'phoro', mp2: 'phoro', done: 'phoro' }[id];
     if (id !== 'ret' && id !== 'wd' && this.rf) this.rf.close(false); // 離開檢影 / 工作距離就收起專注模式
-    if (g.stepId === 'done') { setTimeout(() => this.showResult(), 500); return; }
+    if (g.stepId === 'done') { this.bench?.close(false); this.recClose?.(); setTimeout(() => this.showResult(), 500); return; }
     if (id === 'ret') this.rfDismissed = false;
-    if (want && (want !== this.tab || (want === 'ret' && !this.rf))) this.showTab(want);
-    if (id === 'duo') { g.setAux(g.activeEye, 'RG'); g.setChart({ mode: 'digits', isolate: true }); }
+    this.benchDismissed = false;
+    if (this.imm) {
+      // 沉浸式:檢影 / 工作距離在檢影工作台做;單眼的步驟自動坐到驗光台前
+      if (id === 'setup') this.showTab('setup');
+      else if (id === 'ret' || id === 'wd') { if (!this.rf) this.showTab('ret'); }
+      else this.openBench();
+    } else if (want && (want !== this.tab || (want === 'ret' && !this.rf))) this.showTab(want);
+    if (id === 'duo') { g.setAux(g.activeEye, 'RG'); g.setChart({ mode: 'tumble', isolate: true }); }
     if (id === 'jcc') g.setChart({ mode: 'honey' });
-    if (id === 'mp1' || id === 'mp2' || id === 'va') g.setChart({ mode: 'digits', isolate: true, row: id === 'va' ? 0.6 : g.chart.row });
+    if (id === 'mp1' || id === 'mp2' || id === 'va') g.setChart({ mode: 'tumble', isolate: true, row: id === 'va' ? 0.6 : g.chart.row });
   }
 
   repaintChart() {
@@ -295,8 +362,11 @@ export class App {
       h('span', { class: 'sp' }),
       h('button', { class: 'iconb', type: 'button', 'aria-label': '速查', onclick: () => this.showTab('help') }, '❓'),
       h('button', { class: 'iconb', type: 'button', 'aria-label': '選單', onclick: () => { this.menuOpen = !this.menuOpen; this.renderTop(); } }, '☰'),
-      this.menuOpen ? this.menuPop() : null,
     );
+    // 選單掛在 body 上,才會蓋在驗光台工作台上面
+    this.menuEl?.remove();
+    this.menuEl = this.menuOpen ? this.menuPop() : null;
+    if (this.menuEl) document.body.append(this.menuEl);
     this.renderTimer();
   }
 
@@ -307,6 +377,8 @@ export class App {
       g.mode !== 'exam' ? h('button', { type: 'button', onclick: close(() => { g.god = !g.god; g.emit(); }) }, g.god ? '關閉上帝視角提示' : '開啟上帝視角提示') : null,
       h('button', { type: 'button', onclick: close(() => this.showTab('log')) }, '對話紀錄'),
       h('button', { type: 'button', onclick: close(() => { fx.sound = !fx.sound; if (fx.sound) tick(true); }) }, fx.sound ? '🔊 旋鈕音效:開' : '🔈 旋鈕音效:關'),
+      'speechSynthesis' in window ? h('button', { type: 'button', onclick: close(() => { fx.voice = !fx.voice; }) }, fx.voice ? '🗣 受測者語音:開' : '🤐 受測者語音:關') : null,
+      canImm() ? h('button', { type: 'button', onclick: close(() => this.setLayout(!this.imm)) }, this.imm ? '🗂 改用經典版面(側邊操作台)' : '🎮 改用沉浸式第一人稱') : null,
       h('hr'),
       h('button', { type: 'button', onclick: close(() => this.start({ ...this.opts, seed: g.seed })) }, '重來這位受測者'),
       h('button', { type: 'button', onclick: close(() => { this.opts.seed = Math.floor(Math.random() * 90000) + 1; this.start(this.opts); }) }, '換一位受測者'),
@@ -351,6 +423,24 @@ export class App {
       left.length ? h('ul', { class: `conds${failed ? ' failed' : ''}` }, (failed ? left : left.slice(0, 2)).map(li), !failed && left.length > 2 ? h('li', { class: 'more' }, `…還有 ${left.length - 2} 項`) : null) : null);
   }
 
+  // 教學模式的教練清單:做完的打勾、▶ 是現在要做的(附上為什麼)、後面的先淡淡顯示
+  coachList(c) {
+    const { steps, cur } = c;
+    const li = (st, i) => h('li', { class: `${st.done ? 'ok' : ''}${i === cur ? ' now' : ''}` },
+      h('i', { 'aria-hidden': 'true' }, st.done ? '✓' : i === cur ? '▶' : ''),
+      h('span', {}, st.label, i === cur && st.why ? h('small', { class: 'why2' }, st.why) : null));
+    // 精簡:做完的收成一行,只列「現在 + 接下來兩項」,步驟卡才不會太長
+    const from = cur < 0 ? steps.length : cur;
+    const shown = steps.map((st, i) => [st, i]).filter(([, i]) => i >= from && i < from + 3);
+    const nDone = steps.filter((x) => x.done).length;
+    const doneBefore = steps.slice(0, from).filter((x) => x.done);
+    return h('div', { class: 'coach' },
+      h('div', { class: 'progline' }, h('b', {}, `${nDone} / ${steps.length}`), h('div', { class: 'tr' }, h('div', { class: 'fi', style: { width: `${(nDone / steps.length) * 100}%` } })),
+        doneBefore.length ? h('span', { class: 'donesum', title: doneBefore.map((x) => '✓ ' + x.label).join('\n') }, `✓ ${doneBefore.map((x) => x.label.split(/[,:(]/)[0]).slice(-2).join('、')}`) : null),
+      h('ol', { class: 'conds coachl' }, shown.map(([st, i]) => li(st, i)),
+        steps.length > from + 3 ? h('li', { class: 'more' }, `…還有 ${steps.length - from - 3} 項`) : null));
+  }
+
   renderCard() {
     const g = this.game;
     const def = g.stepDef;
@@ -370,9 +460,14 @@ export class App {
       showHint ? btn(this.cardMin ? '💡' : '💡 提示', () => { this.hintText = g.hint(); this.cardMin = false; this.renderCard(); }, { cls: 'sm', aria: '提示' }) : null,
       last ? null : btn(`${idx === total - 1 ? '完成並結算' : '完成此步驟'}${this.cardMin && conds.length ? `(${nOk}/${conds.length})` : ''} ▶`, () => this.tryAdvance(), { cls: `primary${ready ? ' go' : ''}`, title: 'Enter' }),
     ];
+    acts[1]?.setAttribute('data-coach', 'advance');
     const toggle = h('button', { class: 'b sm ghost', type: 'button', 'aria-label': this.cardMin ? '展開' : '收合', onclick: () => { this.cardMin = !this.cardMin; this.renderCard(); } }, this.cardMin ? '▾' : '▴');
     const failed = g.mode === 'tutorial' && this.showWhy;
-    const nextC = conds.find((c) => !c.ok);
+    // 教學模式用教練的小步驟;自由練習用過關條件
+    const coach = g.mode === 'tutorial' && !last ? coachSteps(g) : null;
+    const curStep = coach && coach.cur >= 0 ? coach.steps[coach.cur] : null;
+    this.coachTarget = curStep?.target ?? (ready ? 'advance' : null);
+    const nextC = curStep ? { label: curStep.label } : conds.find((c) => !c.ok);
     fill(this.stepcard,
       h('div', { class: 'sc-top' },
         h('span', { class: 'no' }, last ? '完成' : `${idx + 1}/${total}`),
@@ -384,7 +479,7 @@ export class App {
         h('div', { class: 'acts' }, acts)) : null,
       h('div', { class: 'dots' }, dots),
       h('p', { class: 'goal' }, g.mode === 'exam' ? '考試模式:沒有提示,照你的流程做。' : STEP_GOAL[key] ?? ''),
-      conds.length ? this.condList(conds, failed) : null,
+      coach?.steps.length ? this.coachList(coach) : conds.length ? this.condList(conds, failed) : null,
       this.hintText ? h('p', { class: 'goal hint' }, this.hintText) : null,
       failed && !g.canAdvance().ok ? h('div', { class: 'why' }, h('ul', {}, g.check().why.map((w) => h('li', {}, w)))) : null,
       this.cardMin ? null : h('div', { class: 'acts' }, acts),
@@ -392,7 +487,52 @@ export class App {
   }
 
   /* ---------------- 視角與分頁 ---------------- */
+  setLayout(imm) {
+    try { localStorage.setItem(LAYOUT_KEY, imm ? 'imm' : 'classic'); } catch { /* ignore */ }
+    this.bench?.close(false);
+    this.imm = imm;
+    this.appEl.classList.toggle('imm', imm);
+    this.appEl.classList.remove('drawer-open');
+    this.showTab(this.tab === 'ret' ? 'ret' : imm && this.game.stepDef.phase ? 'phoro' : this.tab);
+    this.renderStations();
+  }
+
+  // 沉浸式的「桌面工具列」:打開儀器 / 轉頭看別的地方
+  renderDock() {
+    const st = this.scene?.station;
+    const drawer = this.appEl.classList.contains('drawer-open') ? this.tab : null;
+    const items = [
+      ['setup', '🧰', '前置清單', drawer === 'setup', () => this.toggleDrawer('setup')],
+      ['phoro', '🔭', '驗光台', !!this.bench, () => (this.bench ? this.bench.close(true) : this.openBench())],
+      ['ret', '🔦', '檢影鏡', !!this.rf, () => this.showTab('ret'), 'retfocus'],
+      ['sheet', '📋', '紀錄單', !!this.recClose, () => this.openRecord(), 'rec'],
+      null,
+      ['chart', '👀', '轉身看視力表', st === 'chart' && !this.bench, () => this.look('chart')],
+      ['patient', '🙂', '看受測者', st === 'patient' && !this.bench, () => this.look('patient')],
+      ['overview', '🏥', '站起來看全景', st === 'overview' && !this.bench, () => this.look('overview')],
+      null,
+      ['log', '💬', '對話', drawer === 'log', () => this.toggleDrawer('log')],
+      ['help', '❓', '速查', drawer === 'help', () => this.toggleDrawer('help')],
+    ];
+    fill(this.stations, ...items.map((it) => (it ? h('button', { type: 'button', class: `dk${it[3] ? ' on' : ''}`, onclick: it[4], 'data-coach': it[5] ?? null, title: it[2] }, h('i', { 'aria-hidden': 'true' }, it[1]), h('span', {}, it[2])) : h('span', { class: 'dsep' }))));
+  }
+
+  look(station) {
+    this.bench?.close(true);
+    this.appEl.classList.remove('drawer-open');
+    this.scene.goTo(station);
+    this.renderStations();
+  }
+
+  toggleDrawer(tab) {
+    const open = this.appEl.classList.contains('drawer-open') && this.tab === tab;
+    if (open) { this.appEl.classList.remove('drawer-open'); this.renderStations(); return; }
+    this.showTab(tab, tab === 'setup');
+  }
+
   renderStations() {
+    this.stations.classList.toggle('dock', !!this.imm);
+    if (this.imm) { this.renderDock(); return; }
     const defs = [['overview', '診間全景'], ['phoro', '驗光台'], ['ret', '檢影'], ['chart', '視力表'], ['desk', '紀錄單']];
     fill(this.stations, ...defs.map(([id, label]) =>
       h('button', { type: 'button', class: this.scene?.station === id ? 'on' : '', onclick: () => this.goStation(id) }, label)));
@@ -412,10 +552,28 @@ export class App {
       ...tabs.map((t) => h('button', { type: 'button', role: 'tab', class: `t-${t}${this.tab === t ? ' on' : ''}`, 'aria-selected': this.tab === t ? 'true' : 'false', onclick: () => { this.showTab(t); } }, TAB_LABEL[t])),
       h('span', { class: 'grow' }),
       h('button', { type: 'button', class: 'fold', 'aria-label': '收合/展開操作台', onclick: () => this.cycleDeck() }, '⇕'),
+      h('button', { type: 'button', class: 'dclose', 'aria-label': '關閉', onclick: () => { this.appEl.classList.remove('drawer-open'); this.renderStations(); } }, '✕'),
     );
   }
 
   showTab(tab, moveCamera = true) {
+    if (this.imm) {
+      // 沉浸式:儀器用全螢幕工作台,清單類放在右邊的抽屜
+      if (tab === 'phoro' || tab === 'chart') { this.appEl.classList.remove('drawer-open'); this.openBench(); return; }
+      if (tab === 'sheet') { this.openRecord(); return; }
+      if (tab === 'ret') {
+        this.bench?.close(false);
+        this.appEl.classList.remove('drawer-open');
+        this.panels[this.tab]?.onHide?.();
+        this.tab = 'ret';
+        this.scene.goTo('ret');
+        if (!this.rf) { this.rfDismissed = false; this.openFocus(); }
+        this.renderStations();
+        return;
+      }
+      this.bench?.close(false);
+      this.appEl.classList.add('drawer-open');
+    }
     this.panels[this.tab]?.onHide?.();
     this.tab = tab;
     this.renderTabs();
@@ -427,7 +585,8 @@ export class App {
     this.applyDeck(tab);
     this.quick?.render();
     if (tab === 'ret' && !this.rf && !this.rfDismissed) this.openFocus();
-    if (moveCamera) { this.scene.goTo(STATION_FOR_TAB[tab] ?? 'overview'); this.renderStations(); }
+    if (moveCamera) this.scene.goTo(STATION_FOR_TAB[tab] ?? 'overview');
+    this.renderStations();
   }
 
   isSmall() { return window.matchMedia('(max-width: 700px), (max-height: 520px)').matches; }
@@ -447,14 +606,19 @@ export class App {
 
   openFocus() {
     if (this.rf) return;
-    this.rf = openRetFocus(this.game, this.ctx, { onClose: (manual) => { this.rf = null; if (manual) this.rfDismissed = true; } });
+    const slot = this.imm ? h('div', { class: 'coachslot' }, this.stepcard) : null;
+    this.rf = openRetFocus(this.game, this.ctx, {
+      coachSlot: slot,
+      onClose: (manual) => { this.rf = null; if (slot) this.stage.insertBefore(this.stepcard, this.bubble); if (manual) this.rfDismissed = true; this.renderStations(); },
+    });
+    this.renderStations();
   }
 
   hotspot(id) {
     const g = this.game;
     switch (id) {
       case 'phoro': this.showTab('phoro'); break;
-      case 'chart': this.showTab('chart'); break;
+      case 'chart': if (this.imm) this.look('chart'); else this.showTab('chart'); break;
       case 'sheet': this.showTab('sheet'); break;
       case 'ret': this.showTab('ret'); break;
       case 'sanitize': g.sanitize(); this.toast('已消毒'); this.focusSetup('sanitize'); break;

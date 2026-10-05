@@ -7,6 +7,8 @@ import {
   generatePatient, lensToVec, effectiveBlur, predictDecimal, compareLenses, duochrome, clockDial, readRow,
 } from '../src/sim/patient.js';
 import { Game } from '../src/game/state.js';
+import { coachSteps } from '../src/game/coach.js';
+import { optosFor } from '../src/render/chartCanvas.js';
 import { faceSVG, AUX_POS } from '../src/render/phoropterSVG.js';
 import { reflex, residualAt, fullyNeutral, WD_OPTIONS, wdDiopter } from '../src/sim/retino.js';
 
@@ -195,7 +197,7 @@ t('VA:讀視標的紀錄帶有步驟與鏡片,改鏡片後就不算「目前鏡�
   const g = new Game({ mode: 'tutorial', seed: 5 });
   g.step = 3; // OD.va
   g.setTestEye('OD');
-  g.setChart({ mode: 'digits', row: 0.6, isolate: true });
+  g.setChart({ mode: 'tumble', row: 0.6, isolate: true });
   g.askRead();
   const r = g.hist.OD.reads.at(-1);
   assert.equal(r.step, 'OD.va');
@@ -203,6 +205,31 @@ t('VA:讀視標的紀錄帶有步驟與鏡片,改鏡片後就不算「目前鏡�
   g.stepSph('OD', 0.25);
   assert.notEqual(r.lens, g.lensKey('OD'));
   assert.ok(g.conditions()[0].ok, '已在只開 OD 的情況下讀過視標');
+});
+
+console.log('tumbling E / coach');
+t('E 字視標:每列方向固定、相鄰不重複,受測者回答方向', () => {
+  const a = optosFor(9, 0.6), b = optosFor(9, 0.6);
+  assert.deepEqual(a, b);
+  assert.equal(a.length, 5);
+  for (let i = 1; i < a.length; i++) assert.notEqual(a[i], a[i - 1]);
+  const g = new Game({ seed: 9 });
+  g.setTestEye('OD'); g.setChart({ mode: 'tumble', row: 0.3, isolate: true });
+  g.askRead();
+  assert.match(g.log.at(-1).text, /[上下左右]/);
+});
+t('教練:VA 步驟依序打勾,遮眼 → E 視標 → 讀', () => {
+  const g = new Game({ mode: 'tutorial', seed: 9 });
+  g.step = 3;
+  let c = coachSteps(g);
+  assert.equal(c.steps[c.cur].target, 'occ');
+  g.setTestEye('OD');
+  g.setChart({ mode: 'tumble', row: 0.6, isolate: true });
+  c = coachSteps(g);
+  assert.equal(c.steps[c.cur].target, 'read');
+  g.askRead();
+  c = coachSteps(g);
+  assert.ok(c.steps.slice(0, 3).every((x) => x.done));
 });
 
 console.log(`\n${passed} passed`);

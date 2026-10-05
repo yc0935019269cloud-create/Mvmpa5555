@@ -9,7 +9,7 @@ const q = (x) => Math.round(x / 0.25) * 0.25;
 function readBest(g, eye) {
   // 從 0.6 開始往上/往下找「當下最佳視力列」(讀對 >= total-1)
   let best = null;
-  g.setChart({ mode: 'digits', isolate: true });
+  g.setChart({ mode: 'tumble', isolate: true });
   let startIdx = VA_ROWS.indexOf(0.6);
   const ok = (row) => { g.setChart({ row }); const r = g.askRead(); return r && r.correct >= r.total - 1; };
   let i = startIdx;
@@ -24,14 +24,14 @@ function readBest(g, eye) {
 }
 
 function mpmva(g, eye, { fog = true } = {}) {
-  g.setChart({ mode: 'digits', row: 0.6, isolate: true });
+  g.setChart({ mode: 'tumble', row: 0.6, isolate: true });
   if (fog) {
     for (let k = 0; k < 4; k++) g.stepSph(eye, 0.25 * 1); // placeholder, replaced below
   }
 }
 
 function runMpmva(g, eye) {
-  g.setChart({ mode: 'digits', row: 0.6, isolate: true });
+  g.setChart({ mode: 'tumble', row: 0.6, isolate: true });
   // 霧視:+1.00 起,確認 0.6 讀不好
   g.setLens(eye, { s: g.phoro[eye].s + 1.0 });
   let guard = 0;
@@ -63,7 +63,7 @@ function runMpmva(g, eye) {
 
 function runDuo(g, eye) {
   g.setAux(eye, 'RG');
-  g.setChart({ mode: 'digits', row: 0.8, isolate: true });
+  g.setChart({ mode: 'tumble', row: 0.8, isolate: true });
   let seen = new Set();
   for (let k = 0; k < 8; k++) {
     const ans = g.askDuo();

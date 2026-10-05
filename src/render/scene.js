@@ -9,14 +9,21 @@ const cyl = (rt, rb, h, mat, seg = 24) => new THREE.Mesh(new THREE.CylinderGeome
 const sph = (r, mat, seg = 24) => new THREE.Mesh(new THREE.SphereGeometry(r, seg, seg), mat);
 const cap = (r, l, mat) => new THREE.Mesh(new THREE.CapsuleGeometry(r, l, 6, 14), mat);
 
+// 視角:除了「診間全景」是站著看,其餘都是坐在驗光師椅子上的第一人稱(轉頭 / 前傾)
 export const STATIONS = {
   overview: { pos: [1.35, 1.9, 2.75], look: [-0.15, 0.95, -2.6], fov: 56 },
-  phoro: { pos: [0.3, 1.36, -0.82], look: [0, 1.24, 0], fov: 50 },
-  ret: { pos: [0.18, 1.32, -0.95], look: [0, 1.25, 0], fov: 40 },
-  chart: { pos: [0.12, 1.5, -3.95], look: [0, 1.36, -6.2], fov: 40 },
-  desk: { pos: [0.5, 1.55, -0.35], look: [1.15, 0.8, -0.7], fov: 52 },
-  patient: { pos: [0.9, 1.45, -0.7], look: [0, 1.15, 0.1], fov: 46 },
+  phoro: { pos: [0.22, 1.33, -0.86], look: [0, 1.25, 0], fov: 48 },
+  ret: { pos: [0.04, 1.28, -0.62], look: [0.03, 1.265, 0.07], fov: 42 }, // 檢影:前傾到 67 cm 左右
+  chart: { pos: [0.24, 1.27, -0.98], look: [0, 1.4, -6.3], fov: 34 }, // 轉身看 6 m 外的視力表
+  desk: { pos: [0.34, 1.3, -0.9], look: [1.1, 0.78, -0.62], fov: 52 },
+  patient: { pos: [0.5, 1.3, -0.75], look: [0, 1.22, 0.15], fov: 44 },
 };
+for (const st of Object.values(STATIONS)) {
+  const d = st.look.map((v, i) => v - st.pos[i]);
+  st.yaw = Math.atan2(d[0], -d[2]);
+  st.pitch = Math.asin(d[1] / Math.hypot(...d));
+}
+const angDiff = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
 // 綜合驗光儀相對升降桌面的高度:桌高「適中」時,窺孔剛好對齊受測者的眼睛
 const EYE_Y = 1.265; // 受測者眼睛高度(頭 1.25 + 眼 0.015)
@@ -52,8 +59,9 @@ export class ClinicScene {
     this.camera = new THREE.PerspectiveCamera(58, 1, 0.05, 40);
     const s0 = STATIONS.overview;
     this.camPos = new THREE.Vector3(...s0.pos);
-    this.camLook = new THREE.Vector3(...s0.look);
+    this.camYaw = s0.yaw; this.camPitch = s0.pitch;
     this.camFov = s0.fov;
+    this.zoom = 1;
 
     this.buildRoom();
     this.buildFurniture();
@@ -228,7 +236,12 @@ export class ClinicScene {
     frame.position.set(0, 1.4, -6.33); S.add(frame);
     this.chartMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.84), new THREE.MeshBasicMaterial({ map: this.chartTex }));
     this.chartMesh.position.set(0, 1.4, -6.298); S.add(this.chartMesh);
-    this.chartGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.5), new THREE.MeshBasicMaterial({ color: 0xfff6dd, transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthWrite: false }));
+    // 投影光打在牆上的光暈(邊緣柔和的圓形)
+    const gc = document.createElement('canvas'); gc.width = gc.height = 128;
+    const gx = gc.getContext('2d'), gg = gx.createRadialGradient(64, 64, 8, 64, 64, 64);
+    gg.addColorStop(0, 'rgba(255,246,221,1)'); gg.addColorStop(0.55, 'rgba(255,246,221,.45)'); gg.addColorStop(1, 'rgba(255,246,221,0)');
+    gx.fillStyle = gg; gx.fillRect(0, 0, 128, 128);
+    this.chartGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(gc), transparent: true, opacity: 0.0, blending: THREE.AdditiveBlending, depthWrite: false }));
     this.chartGlow.position.set(0, 1.4, -6.29); S.add(this.chartGlow);
     const lab = box(0.5, 0.02, 0.02, M(0x1b2227)); lab.position.set(0, 0.92, -6.3);
     S.add(lab);
@@ -368,31 +381,43 @@ export class ClinicScene {
       b.setAttribute('aria-label', label);
       b.innerHTML = `<i></i><span>${label}</span>`;
       b.addEventListener('click', (e) => { e.stopPropagation(); this.onHotspot?.(id); });
+      const coach = { sanitize: 'setup:sanitize', pd: 'setup:pd', switch: 'setup:dim', table: 'setup:height', ret: 'retfocus', sheet: 'rec' }[id];
+      if (coach) b.dataset.coach = coach;
       this.hotspotLayer.appendChild(b);
       return { id, el: b, pos, stations: st };
     });
   }
 
   /* ---------------- 互動 ---------------- */
+  // 拖曳 = 抓著畫面轉頭(左右、上下方向一致,跟街景一樣);滾輪拉近拉遠;雙擊回正
   bindDrag() {
     const el = this.renderer.domElement;
     let down = null;
-    el.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, yaw: this.lookTarget.yaw, pitch: this.lookTarget.pitch }; el.setPointerCapture(e.pointerId); });
+    el.addEventListener('pointerdown', (e) => {
+      down = { x: e.clientX, y: e.clientY, yaw: this.lookTarget.yaw, pitch: this.lookTarget.pitch };
+      el.setPointerCapture(e.pointerId);
+      el.classList.add('dragging');
+    });
     el.addEventListener('pointermove', (e) => {
       if (!down) return;
-      const k = 0.0035;
-      this.lookTarget.yaw = Math.max(-0.5, Math.min(0.5, down.yaw - (e.clientX - down.x) * k));
-      this.lookTarget.pitch = Math.max(-0.3, Math.min(0.3, down.pitch - (e.clientY - down.y) * k));
+      // 換算成「螢幕上移動幾度視角」,手感與縮放無關
+      const k = ((this.camera.fov * Math.PI) / 180) / Math.max(200, this.container.clientHeight);
+      this.lookTarget.yaw = Math.max(-1.3, Math.min(1.3, down.yaw - (e.clientX - down.x) * k));
+      this.lookTarget.pitch = Math.max(-0.6, Math.min(0.6, down.pitch + (e.clientY - down.y) * k));
     });
-    const up = () => { down = null; };
+    const up = () => { down = null; el.classList.remove('dragging'); };
     el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
-    el.addEventListener('dblclick', () => { this.lookTarget.yaw = 0; this.lookTarget.pitch = 0; });
+    el.addEventListener('dblclick', () => { this.lookTarget.yaw = 0; this.lookTarget.pitch = 0; this.zoom = 1; });
+    el.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      this.zoom = Math.max(0.45, Math.min(1.25, this.zoom * (e.deltaY > 0 ? 1.08 : 1 / 1.08)));
+    }, { passive: false });
   }
 
   goTo(name) {
     if (!STATIONS[name]) return;
     this.station = name;
-    this.lookTarget.yaw = 0; this.lookTarget.pitch = 0;
+    this.lookTarget.yaw = 0; this.lookTarget.pitch = 0; this.zoom = 1;
     this.updateHotspots();
   }
 
@@ -418,7 +443,7 @@ export class ClinicScene {
     this.scene.background.set(dim ? 0x8d979b : 0xdfe6e8);
     this.scene.fog.color.set(dim ? 0x8d979b : 0xdfe6e8);
     this.beam.material.opacity = dim ? 0.05 : 0.0;
-    this.chartGlow.material.opacity = dim ? 0.07 : 0.0;
+    this.chartGlow.material.opacity = dim ? 0.22 : 0.0;
     this.renderer.toneMappingExposure = dim ? 1.05 : 1.0;
     this.faceMesh.material.color.setScalar(dim ? 0.72 : 1);
     this.updateFaceTexture();
@@ -457,21 +482,24 @@ export class ClinicScene {
   loop() {
     const dt = Math.min(0.05, this.clock.getDelta());
     const t = this.clock.elapsedTime;
-    // 鏡頭平滑移動
+    // 換視角 = 轉頭 / 前傾(慢一點);滑鼠拖曳 = 即時跟手(快)
     const st = STATIONS[this.station];
     const k = 1 - Math.exp(-dt * 4.2);
+    const kf = 1 - Math.exp(-dt * 16);
     this.camPos.lerp(new THREE.Vector3(...st.pos), k);
-    this.camLook.lerp(new THREE.Vector3(...st.look), k);
-    this.camFov += (st.fov - this.camFov) * k;
-    this.look.yaw += (this.lookTarget.yaw - this.look.yaw) * k;
-    this.look.pitch += (this.lookTarget.pitch - this.look.pitch) * k;
-    const dir = this.camLook.clone().sub(this.camPos);
-    const dist = dir.length();
-    const yaw = Math.atan2(dir.x, -dir.z) + this.look.yaw;
-    const pitch = Math.asin(dir.y / dist) + this.look.pitch;
+    this.camYaw += angDiff(this.camYaw, st.yaw) * k; // 走最短的方向轉身
+    this.camPitch += (st.pitch - this.camPitch) * k;
+    this.camFov += (st.fov * this.zoom - this.camFov) * kf;
+    this.look.yaw += (this.lookTarget.yaw - this.look.yaw) * kf;
+    this.look.pitch += (this.lookTarget.pitch - this.look.pitch) * kf;
+    // 坐著的人頭會有一點點自然晃動(呼吸)
+    const sway = this.station === 'overview' ? 0 : Math.sin(t * 0.9) * 0.0025;
+    const yaw = this.camYaw + this.look.yaw + sway * 0.4;
+    const pitch = Math.max(-1.3, Math.min(1.3, this.camPitch + this.look.pitch + sway));
     const d2 = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
     this.camera.position.copy(this.camPos);
-    this.camera.lookAt(this.camPos.clone().add(d2.multiplyScalar(dist)));
+    this.camera.position.y += this.station === 'overview' ? 0 : Math.sin(t * 0.9) * 0.002;
+    this.camera.lookAt(this.camera.position.clone().add(d2));
     const portrait = this.aspect < 1;
     this.camera.fov = this.camFov * (portrait ? 1.35 : 1);
     this.camera.updateProjectionMatrix();
@@ -485,7 +513,17 @@ export class ClinicScene {
     if (this.patientGroup) this.patientGroup.children[0].scale.y = 1 + Math.sin(t * 1.6) * 0.008;
     this.renderer.render(this.scene, this.camera);
     this.projectHotspots();
+    this.onFrame?.();
     this._raf = requestAnimationFrame(this.loop);
+  }
+
+  // 3D 座標 → 舞台上的像素位置(在鏡頭後面或畫面外回傳 null)
+  screenPos(x, y, z) {
+    const v = new THREE.Vector3(x, y, z).project(this.camera);
+    if (v.z < -1 || v.z > 1) return null;
+    const w = this.container.clientWidth, h = this.container.clientHeight;
+    const px = (v.x * 0.5 + 0.5) * w, py = (-v.y * 0.5 + 0.5) * h;
+    return px < 0 || px > w || py < 0 || py > h ? null : { x: px, y: py };
   }
 
   projectHotspots() {

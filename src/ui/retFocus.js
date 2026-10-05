@@ -42,7 +42,7 @@ function angleDial(view, onChange) {
   return { el, draw };
 }
 
-export function openRetFocus(game, ctx, { onClose } = {}) {
+export function openRetFocus(game, ctx, { onClose, coachSlot = null } = {}) {
   const canvas = h('canvas', { class: 'retcv big', 'aria-label': '檢影:瞳孔內的反射光' });
   const view = new RetinoView(canvas, game);
   view.eye = game.activeEye;
@@ -100,7 +100,7 @@ export function openRetFocus(game, ctx, { onClose } = {}) {
   const root = desk
     ? h('div', { class: 'retfs desk', role: 'dialog', 'aria-label': '檢影工作台' },
       head,
-      h('div', { class: 'rfface' }, face.el,
+      h('div', { class: 'rfface' }, coachSlot, face.el,
         h('p', { class: 'rftip' }, '球面:轉外側大半圓(手指往上 = 度數增加)或強球旋鈕;散光:散光度旋鈕與軸旋鈕。測試眼會標示 ●。')),
       h('div', { class: 'rfright' }, h('div', { class: 'rfcanvas' }, canvas), ctl),
       bottom)
