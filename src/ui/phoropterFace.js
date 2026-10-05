@@ -7,6 +7,8 @@ import { VA_ROWS } from '../sim/optics.js';
 const KNOBS = {
   aux: { stepDeg: 42, sign: -1, apply: (g, e, d) => { const i = Math.max(0, AUX_POS.indexOf(g.phoro[e].aux)); g.setAux(e, AUX_POS[(i + d + AUX_POS.length) % AUX_POS.length]); } },
   coarse: { stepDeg: 26, sign: 1, apply: (g, e, d) => g.stepSph(e, d * 3) },
+  // 外側大半圓:手指在輪緣上「往上」= 度數增加(左右兩側旋轉方向相反)
+  wheel: { stepDeg: 12, sign: (e) => (e === 'OD' ? 1 : -1), tap: 'y', apply: (g, e, d) => g.stepSph(e, d * 0.25) },
   fine: { stepDeg: 22, sign: -1, apply: (g, e, d) => g.stepSph(e, d * 0.25) },
   cyl: { stepDeg: 18, sign: -1, apply: (g, e, d) => g.stepCyl(e, d * 0.25) }, // 順時針 = 多一格負散光
   axis: { stepDeg: 10, sign: 1, apply: (g, e, d) => g.stepAxis(e, d * 5) },
@@ -37,11 +39,16 @@ export class PhoropterFace {
     this.drag = null;
     this.bind();
     faces.add(this);
-    this.update();
+    this.updateNow();
   }
 
-  update() { this.el.innerHTML = faceSVG(this.game); }
-  destroy() { faces.delete(this); }
+  // 同一個畫面幀內只重繪一次(拖曳時連續多格也不會卡)
+  update() {
+    if (this._raf) return;
+    this._raf = requestAnimationFrame(() => { this._raf = 0; this.el.innerHTML = faceSVG(this.game); });
+  }
+  updateNow() { cancelAnimationFrame(this._raf); this._raf = 0; this.el.innerHTML = faceSVG(this.game); }
+  destroy() { faces.delete(this); cancelAnimationFrame(this._raf); }
 
   bind() {
     const el = this.el;
@@ -50,8 +57,16 @@ export class PhoropterFace {
       const g = find(e.target);
       if (!g) return;
       const k = g.dataset.k, eye = g.dataset.e;
-      const rect = g.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+      let cx, cy;
+      if (g.dataset.cx) { // 圓心不在元件正中間(外側半圓輪):用 SVG 座標換算
+        const svg = g.ownerSVGElement, pt = svg.createSVGPoint();
+        pt.x = +g.dataset.cx; pt.y = +g.dataset.cy;
+        const p = pt.matrixTransform(svg.getScreenCTM());
+        cx = p.x; cy = p.y;
+      } else {
+        const rect = g.getBoundingClientRect();
+        cx = rect.left + rect.width / 2; cy = rect.top + rect.height / 2;
+      }
       this.drag = { k, eye, cx, cy, last: Math.atan2(e.clientY - cy, e.clientX - cx), acc: 0, total: 0, x0: e.clientX, y0: e.clientY, moved: false, id: e.pointerId };
       el.setPointerCapture(e.pointerId);
       window.__pfDrag = true;
@@ -73,7 +88,7 @@ export class PhoropterFace {
       while (Math.abs(d.acc) >= kn.stepDeg) {
         const dir = d.acc > 0 ? 1 : -1;
         d.acc -= dir * kn.stepDeg;
-        kn.apply(this.game, d.eye, dir * kn.sign);
+        kn.apply(this.game, d.eye, dir * (typeof kn.sign === 'function' ? kn.sign(d.eye) : kn.sign));
       }
     });
     const end = (e) => {
@@ -85,7 +100,7 @@ export class PhoropterFace {
       if (!d.moved) {
         if (TAPS[d.k]) TAPS[d.k](this.game, d.eye);
         else if (KNOBS[d.k]) {
-          const dir = e.clientX >= d.cx ? 1 : -1; // 右半邊 = 值增加,左半邊 = 值減少
+          const dir = (KNOBS[d.k].tap === 'y' ? e.clientY <= d.cy : e.clientX >= d.cx) ? 1 : -1; // 右半邊(輪緣:上半)= 增加
           // 把「值增加」換算成旋鈕的 apply 方向
           const kn = KNOBS[d.k];
           kn.apply(this.game, d.eye, dir * (['cyl'].includes(d.k) ? -1 : 1) * (d.k === 'aux' ? 1 : 1));

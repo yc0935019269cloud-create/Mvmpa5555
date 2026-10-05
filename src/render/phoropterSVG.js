@@ -72,8 +72,43 @@ function sideSVG(game, eye) {
   const jccOn = jcc.mode !== 'off' && active;
   let out = '';
 
-  // 腔體(圓形外殼)
-  out += `<g clip-path="url(#pf-body)"><circle cx="${500 + k * 292}" cy="400" r="248" fill="url(#pf-cell)" stroke="#9d978a" stroke-width="3"/><circle cx="${500 + k * 292}" cy="400" r="226" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2"/></g>`;
+  // 外側大半圓「球面轉輪」+ 圓形腔體
+  const ccx = 500 + k * 252, ccy = 405, Rw = 226;
+  const clipW = `pf-wh-${eye}`;
+  const frac = (x) => x - Math.floor(x);
+  let wheel = '';
+  const base = Math.round(L.s / 0.25);
+  for (let j = base - 18; j <= base + 18; j++) {
+    const val = j * 0.25;
+    const al = ((val - L.s) * 48 * Math.PI) / 180; // 每 1D = 48°
+    if (Math.abs(al) > 1.72) continue;
+    const major = j % 4 === 0;
+    const x1 = ccx + k * Math.cos(al) * (Rw - (major ? 18 : 10)), y1 = ccy + Math.sin(al) * (Rw - (major ? 18 : 10));
+    const x2 = ccx + k * Math.cos(al) * (Rw + 8), y2 = ccy + Math.sin(al) * (Rw + 8);
+    wheel += `<line x1="${r1(x1)}" y1="${r1(y1)}" x2="${r1(x2)}" y2="${r1(y2)}" stroke="#1f2326" stroke-width="${major ? 2.6 : 1.3}"/>`;
+    if (major) {
+      const tx = ccx + k * Math.cos(al) * (Rw + 1), ty = ccy + Math.sin(al) * (Rw + 1);
+      const n = val;
+      wheel += `<text x="${r1(tx)}" y="${r1(ty + 6)}" text-anchor="middle" font-size="19" font-weight="800" fill="#101315" font-family="'IBM Plex Mono',monospace" stroke="#e9ecee" stroke-width="3" paint-order="stroke">${n > 0 ? '+' + n : n === 0 ? '0' : '−' + Math.abs(n)}</text>`;
+    }
+  }
+  const knurlOff = ((L.s * 48 * Math.PI) / 180) * Rw * (k < 0 ? 1 : -1);
+  const wa = (96 * Math.PI) / 180;
+  const wedge = [[0, 0], [k * -Math.cos(wa) * -1, 0]].length && `${ccx},${ccy} ${r1(ccx + k * Math.cos(wa) * 420)},${r1(ccy - Math.sin(wa) * 420)} ${r1(ccx + k * 420)},${ccy - 0} ${r1(ccx + k * Math.cos(wa) * 420)},${r1(ccy + Math.sin(wa) * 420)}`;
+  out += `<clipPath id="${clipW}"><polygon points="${wedge}"/></clipPath>`;
+  out += `<g class="pf-wheel" data-k="wheel" data-e="${eye}" data-cx="${ccx}" data-cy="${ccy}" style="cursor:ns-resize"><title>球面轉輪:手指在輪緣上往上轉 = 度數增加,往下 = 減少</title>
+    <g clip-path="url(#${clipW})" filter="url(#pf-sh)">
+      <circle cx="${ccx}" cy="${ccy}" r="${Rw}" fill="none" stroke="#8f979b" stroke-width="48"/>
+      <circle cx="${ccx}" cy="${ccy}" r="${Rw}" fill="none" stroke="url(#pf-chrome)" stroke-width="44"/>
+      <circle cx="${ccx}" cy="${ccy}" r="${Rw}" fill="none" stroke="#3d4448" stroke-width="40" stroke-dasharray="2.2 3" stroke-dashoffset="${r1(knurlOff)}" opacity=".35"/>
+      <circle cx="${ccx}" cy="${ccy}" r="${Rw}" fill="none" stroke="#dfe3e5" stroke-width="30" opacity=".95"/>
+      ${wheel}
+      <circle cx="${ccx}" cy="${ccy}" r="${Rw}" fill="none" stroke="transparent" stroke-width="60"/>
+    </g>
+  </g>
+  <polygon points="${ccx + k * (Rw + 4)},${ccy} ${ccx + k * (Rw + 26)},${ccy - 11} ${ccx + k * (Rw + 26)},${ccy + 11}" fill="#c1382b" stroke="#fff" stroke-width="1.2"/>
+`;
+  out += `<circle cx="${ccx}" cy="${ccy}" r="206" fill="url(#pf-cell)" stroke="#9d978a" stroke-width="3" filter="url(#pf-sh2)"/><circle cx="${ccx}" cy="${ccy}" r="192" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="2"/>`;
 
   /* --- 窺孔 --- */
   const clipId = `pf-ap-${eye}`;
@@ -117,12 +152,12 @@ function sideSVG(game, eye) {
     inner: `<circle cx="${500 + k * 288}" cy="112" r="24" fill="url(#pf-chrome)" opacity=".8"/>${ringLabels(500 + k * 288, 112, 24, ['0', '3', '6', '9', '12', '15'], 11)}`,
   });
 
-  /* --- 弱球面轉盤(每格 0.25D,數字 = 1D) --- */
-  const fwx = 500 + k * 352, fwy = 470;
+  /* --- 球面度數盤(鏡片窗口外圈,和外側轉輪連動) --- */
+  const fwx = 500 + k * 338, fwy = 486;
   const nums = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'];
   out += knob({
-    id: 'fine', e: eye, cx: fwx, cy: fwy, r: 94, rot: -(L.s * 30), label: '弱球 0.25D/格',
-    inner: `<circle cx="${fwx}" cy="${fwy}" r="70" fill="url(#pf-chrome)" opacity=".92" stroke="#6a7176"/>${ticks(fwx, fwy, 60, 70, 48, '#202427', 1.1)}${ringLabels(fwx, fwy, 50, nums, 15)}<circle cx="${fwx}" cy="${fwy}" r="26" fill="#3b4146"/><circle cx="${fwx}" cy="${fwy}" r="22" fill="url(#pf-chrome)"/>`,
+    id: 'fine', e: eye, cx: fwx, cy: fwy, r: 72, rot: -(L.s * 30), label: '球面度數盤',
+    inner: `<circle cx="${fwx}" cy="${fwy}" r="54" fill="url(#pf-chrome)" opacity=".92" stroke="#6a7176"/>${ticks(fwx, fwy, 46, 54, 48, '#202427', 1.1)}${ringLabels(fwx, fwy, 38, nums, 12)}<circle cx="${fwx}" cy="${fwy}" r="22" fill="#3b4146"/><circle cx="${fwx}" cy="${fwy}" r="18" fill="url(#pf-glass)"/>`,
   });
 
   /* --- 散光軸環(黑色刻度環,圓心是散光鏡窗口) --- */
@@ -174,7 +209,7 @@ export function faceSVG(game, { interactive = true } = {}) {
   let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VB_W} ${VB_H}" width="${VB_W}" height="${VB_H}" font-family="'Noto Sans TC',sans-serif" ${interactive ? 'class="pf-svg"' : ''}>`;
   s += defs();
   // 主體底板
-  s += `<rect x="14" y="36" width="972" height="634" rx="70" fill="url(#pf-paint)" stroke="#a49e90" stroke-width="3"/>`;
+  s += `<rect x="60" y="36" width="880" height="634" rx="70" fill="url(#pf-paint)" stroke="#a49e90" stroke-width="3"/>`;
   // 上方橫樑 + 中央立柱
   s += `<rect x="170" y="8" width="660" height="148" rx="34" fill="url(#pf-paint2)" stroke="#9d978a" stroke-width="3" filter="url(#pf-sh)"/>`;
   s += `<rect x="404" y="8" width="192" height="330" rx="30" fill="url(#pf-paint2)" stroke="#9d978a" stroke-width="3" filter="url(#pf-sh)"/>`;

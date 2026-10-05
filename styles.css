@@ -341,3 +341,19 @@ body.rf-open { overflow: hidden; }
 .retfs .rfbar .b.big { min-height: 46px; font-size: 14px; font-family: var(--sans); }
 .stepcard.min .b { white-space: nowrap; font-size: 13px; padding: 6px 10px; min-height: 40px; }
 .stepcard.min .sc-top h3 { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+/* ---------- 檢影工作台(電腦版):左 綜合驗光儀 / 右 光帶畫面 ---------- */
+.retfs.desk { display: grid; grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; }
+.retfs.desk .rfhead { grid-column: 1 / -1; padding: 10px 14px; }
+.retfs.desk .rfface { grid-column: 1; grid-row: 2; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 0 8px 0 14px; min-height: 0; }
+.retfs.desk .rfface .pface { width: 100%; max-width: none; }
+.retfs.desk .rfright { grid-column: 2; grid-row: 2; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 0 14px 6px 6px; min-height: 0; }
+.retfs.desk .rfcanvas { padding: 0; }
+.retfs.desk .retcv.big { max-height: none; }
+.retfs.desk .rfctl { overflow: visible; flex: none; padding: 0; }
+.retfs.desk .rfbar { grid-column: 1 / -1; padding: 10px 14px 12px; }
+.retfs.desk .rftip { display: block; }
+
+.retfs details.fold { border-top: 1px dashed #324750; padding-top: 4px; }
+.retfs details.fold summary { color: #9fc4d2; cursor: pointer; padding: 8px 0; font-size: 14px; }
+.retfs details.fold[open] { display: flex; flex-direction: column; gap: 8px; }

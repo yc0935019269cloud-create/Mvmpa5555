@@ -200,7 +200,7 @@ function faceBlock(game, ctx) {
   const key = '_face';
   const wrap = h('div', { class: 'facewrap' });
   const face = (ctx[key] ??= new PhoropterFace(game));
-  face.update();
+  face.updateNow();
   wrap.append(face.el,
     h('div', { class: 'row wrap' }, h('button', { class: 'b sm', type: 'button', onclick: () => openZoom(game) }, '⤢ 放大'),
       h('span', { class: 'note' }, '拖曳旋鈕轉動;點旋鈕左半(−)/右半(+);滾輪也可')),

@@ -323,7 +323,7 @@ export class App {
     p.onShow?.();
     this.applyDeck(tab);
     this.quick?.render();
-    if (tab === 'ret' && this.isSmall() && !this.rf && !this.rfDismissed) this.openFocus();
+    if (tab === 'ret' && !this.rf && !this.rfDismissed) this.openFocus();
     if (moveCamera) { this.scene.goTo(STATION_FOR_TAB[tab] ?? 'overview'); this.renderStations(); }
   }
 

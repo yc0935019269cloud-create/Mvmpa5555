@@ -1,6 +1,7 @@
 // 檢影「專注模式」:全螢幕、單手可操作(手機直放 / 橫放各有版面)
 import { h, btn, holdRepeat, segmented } from './dom.js';
 import { RetinoView } from './retinoCanvas.js';
+import { PhoropterFace } from './phoropterFace.js';
 import { EYES, EYE_LABEL } from '../game/state.js';
 import { WD_OPTIONS } from '../sim/retino.js';
 import { fmtRx, fmtSph } from '../sim/optics.js';
@@ -45,6 +46,9 @@ export function openRetFocus(game, ctx, { onClose } = {}) {
   const view = new RetinoView(canvas, game);
   view.eye = game.activeEye;
   const stops = [];
+  // 電腦版:左邊是綜合驗光儀、右邊是光帶畫面
+  const desk = window.matchMedia('(min-width: 900px) and (min-height: 600px)').matches;
+  const face = desk ? new PhoropterFace(game, { zoom: true }) : null;
 
   // --- 鏡片列(固定元件,只更新文字,不重建 → 長按連續調整不會被打斷)
   const refs = {};
@@ -79,20 +83,27 @@ export function openRetFocus(game, ctx, { onClose } = {}) {
   const bottom = h('div', { class: 'rfbar' });
   const tip = h('p', { class: 'rftip' }, '在畫面上左右拖曳 = 掃動光條;轉動圓盤 = 轉光條角度。順動加正、逆動減正,雙軸都中和(整個瞳孔亮起)就完成。');
 
-  const root = h('div', { class: 'retfs', role: 'dialog', 'aria-label': '檢影專注模式' },
-    h('div', { class: 'rfhead' },
-      h('button', { class: 'b big', type: 'button', onclick: () => close(true) }, '✕ 返回'),
-      eyeSeg, h('span', { class: 'sp' }), hintBtn, wdSel),
-    h('div', { class: 'rfcanvas' }, canvas),
-    h('div', { class: 'rfctl' },
-      h('div', { class: 'rxrow' }, rxOut),
-      h('div', { class: 'angrow' }, dial.el,
-        h('div', { class: 'angbtns' },
-          h('div', { class: 'row' }, mk('−15°', () => setAngle(view.angle - 15)), mk('−2°', () => setAngle(view.angle - 2))),
-          h('div', { class: 'row' }, mk('+2°', () => setAngle(view.angle + 2)), mk('+15°', () => setAngle(view.angle + 15))),
-          h('div', { class: 'row' }, autoBtn, slowBtn))),
-      ...rows, tip),
-    bottom);
+  const ctl = h('div', { class: 'rfctl' },
+    h('div', { class: 'rxrow' }, rxOut),
+    h('div', { class: 'angrow' }, dial.el,
+      h('div', { class: 'angbtns' },
+        h('div', { class: 'row' }, mk('−15°', () => setAngle(view.angle - 15)), mk('−2°', () => setAngle(view.angle - 2))),
+        h('div', { class: 'row' }, mk('+2°', () => setAngle(view.angle + 2)), mk('+15°', () => setAngle(view.angle + 15))),
+        h('div', { class: 'row' }, autoBtn, slowBtn))),
+    desk ? h('details', { class: 'fold dark' }, h('summary', {}, '精確按鈕調整(球面 / 散光 / 軸度)'), ...rows) : rows,
+    tip);
+  const head = h('div', { class: 'rfhead' },
+    h('button', { class: 'b big', type: 'button', onclick: () => close(true) }, desk ? '✕ 返回診間' : '✕ 返回'),
+    eyeSeg, h('span', { class: 'sp' }), hintBtn, wdSel);
+  const root = desk
+    ? h('div', { class: 'retfs desk', role: 'dialog', 'aria-label': '檢影工作台' },
+      head,
+      h('div', { class: 'rfface' }, face.el,
+        h('p', { class: 'rftip' }, '球面:轉外側大半圓(手指往上 = 度數增加)或強球旋鈕;散光:散光度旋鈕與軸旋鈕。測試眼會標示 ●。')),
+      h('div', { class: 'rfright' }, h('div', { class: 'rfcanvas' }, canvas), ctl),
+      bottom)
+    : h('div', { class: 'retfs', role: 'dialog', 'aria-label': '檢影專注模式' },
+      head, h('div', { class: 'rfcanvas' }, canvas), ctl, bottom);
   function setAngle(a) { view.angle = ((Math.round(a) - 1 + 180) % 180) + 1; dial.draw(); }
 
   function renderBottom() {
@@ -131,11 +142,13 @@ export function openRetFocus(game, ctx, { onClose } = {}) {
     slowBtn.textContent = view.slow ? '慢動作 ✓' : '慢動作';
     hintBtn.textContent = view.hintOn ? '💡 ✓' : '💡';
     eyeSeg.replaceChildren(...EYES.map((e) => h('button', { type: 'button', class: `s${view.eye === e ? ' on' : ''}`, onclick: () => { view.eye = e; g.setActiveEye(e); sync(); } }, e === 'OD' ? 'OD 右' : 'OS 左')));
+    face?.update();
     renderBottom();
   }
 
   function close(manual) {
     stops.forEach((s) => s());
+    face?.destroy();
     view.stop(); off(); root.remove();
     document.body.classList.remove('rf-open');
     onClose?.(manual);
