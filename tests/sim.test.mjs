@@ -6,7 +6,7 @@ import {
 import {
   generatePatient, lensToVec, effectiveBlur, predictDecimal, compareLenses, duochrome, clockDial, readRow,
 } from '../src/sim/patient.js';
-import { reflex, residualAt, fullyNeutral } from '../src/sim/retino.js';
+import { reflex, residualAt, fullyNeutral, WD_OPTIONS, wdDiopter } from '../src/sim/retino.js';
 
 let passed = 0;
 const t = (name, fn) => {
@@ -145,6 +145,16 @@ t('散光未矯正時,光條歪斜;對齊主軸時歪斜為 0', () => {
   const on = reflex(trueRx, lens, 1.5, 180);
   assert.ok(Math.abs(off.skew) > 10, `off=${off.skew}`);
   near(on.skew, 0, 1e-6);
+});
+
+t('各工作距離:中和鏡片 = 真實處方 + 1/WD,且選項度數與距離一致', () => {
+  const trueRx = { s: -2, c: -1, a: 180 };
+  for (const o of WD_OPTIONS) {
+    near(wdDiopter(o.cm), o.d, 1e-9, `${o.cm}cm`);
+    const lens = { s: trueRx.s + o.d, c: trueRx.c, a: trueRx.a };
+    assert.ok(fullyNeutral(trueRx, lens, o.d), `${o.cm} cm`);
+    assert.ok(!fullyNeutral(trueRx, { ...lens, s: lens.s + 0.75 }, o.d));
+  }
 });
 
 console.log(`\n${passed} passed`);

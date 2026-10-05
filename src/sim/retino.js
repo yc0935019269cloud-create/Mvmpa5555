@@ -1,10 +1,15 @@
 // 檢影模型:給定鏡片與光條角度,算出眼底反射的「型態」
 import { toVec, fromVec, subVec, meridianPower, rad, mod180 } from './optics.js';
 
+// 常見檢影工作距離(cm → 工作距離度數 D);近距離(25–40 cm)度數大,別忘了要扣掉
 export const WD_OPTIONS = [
-  { cm: 40, d: 2.5 },
+  { cm: 25, d: 4.0, note: '近' },
+  { cm: 33, d: 3.0, note: '近' },
+  { cm: 40, d: 2.5, note: '近' },
   { cm: 50, d: 2.0 },
-  { cm: 67, d: 1.5 },
+  { cm: 57, d: 1.75 },
+  { cm: 67, d: 1.5, note: '常用' },
+  { cm: 80, d: 1.25 },
   { cm: 100, d: 1.0 },
 ];
 export const wdDiopter = (cm) => Math.round((100 / cm) / 0.25) * 0.25; // 67 cm → 1.50D
