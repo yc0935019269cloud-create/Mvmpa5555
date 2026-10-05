@@ -49,6 +49,7 @@ export function openRetFocus(game, ctx, { onClose } = {}) {
   // 電腦版:左邊是綜合驗光儀、右邊是光帶畫面
   const desk = window.matchMedia('(min-width: 900px) and (min-height: 600px)').matches;
   const face = desk ? new PhoropterFace(game, { zoom: true }) : null;
+  face?.attachRetino(view);
 
   // --- 鏡片列(固定元件,只更新文字,不重建 → 長按連續調整不會被打斷)
   const refs = {};

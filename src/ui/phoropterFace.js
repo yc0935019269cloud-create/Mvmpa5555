@@ -35,8 +35,13 @@ window.__pfDrag = false;
 export class PhoropterFace {
   constructor(game, { zoom = false } = {}) {
     this.game = game;
-    this.el = h('div', { class: `pface${zoom ? ' zoom' : ''}`, role: 'group', 'aria-label': '綜合驗光儀,可旋轉旋鈕' });
+    this.svgHost = h('div', { class: 'pfsvg' });
+    this.ovl = h('div', { class: 'pfovl' });
+    this.el = h('div', { class: `pface${zoom ? ' zoom' : ''}`, role: 'group', 'aria-label': '綜合驗光儀,可旋轉旋鈕' },
+      h('div', { class: 'pfinner' }, this.svgHost, this.ovl));
     this.drag = null;
+    this.retino = null;
+    this.rets = {};
     this.bind();
     faces.add(this);
     this.updateNow();
@@ -45,10 +50,52 @@ export class PhoropterFace {
   // 同一個畫面幀內只重繪一次(拖曳時連續多格也不會卡)
   update() {
     if (this._raf) return;
-    this._raf = requestAnimationFrame(() => { this._raf = 0; this.el.innerHTML = faceSVG(this.game); });
+    this._raf = requestAnimationFrame(() => { this._raf = 0; this.render(); });
   }
-  updateNow() { cancelAnimationFrame(this._raf); this._raf = 0; this.el.innerHTML = faceSVG(this.game); }
-  destroy() { faces.delete(this); cancelAnimationFrame(this._raf); }
+  updateNow() { cancelAnimationFrame(this._raf); this._raf = 0; this.render(); }
+  render() { this.svgHost.innerHTML = faceSVG(this.game); this.layoutRetino(); }
+  destroy() { faces.delete(this); cancelAnimationFrame(this._raf); this.detachRetino(); }
+
+  // 把檢影畫面(光帶、瞳孔反射)畫進左右兩個窺孔裡:像真的從驗光儀看病人的眼睛
+  attachRetino(view) {
+    if (this.retino === view) return;
+    this.detachRetino();
+    this.retino = view;
+    for (const eye of ['OD', 'OS']) {
+      const c = h('canvas', { class: 'pfret', width: 220, height: 220, 'aria-hidden': 'true' });
+      this.rets[eye] = c;
+      this.ovl.append(c);
+    }
+    this._cb = () => {
+      // 專注模式蓋在上面時,底下那台不必重畫
+      if (document.body.classList.contains('rf-open') && !this.el.closest('.retfs')) return;
+      for (const eye of ['OD', 'OS']) if (this.rets[eye]?.style.display !== 'none') view.paintAperture(this.rets[eye], eye);
+    };
+    view.frameCbs.add(this._cb);
+    this.layoutRetino();
+  }
+  detachRetino() {
+    if (this.retino && this._cb) this.retino.frameCbs.delete(this._cb);
+    this.retino = null; this._cb = null;
+    this.ovl.replaceChildren();
+    this.rets = {};
+  }
+  layoutRetino() {
+    if (!this.retino) return;
+    const P = this.game.phoro;
+    const pdOff = (P.pd - 62) * 1.6;
+    for (const eye of ['OD', 'OS']) {
+      const c = this.rets[eye];
+      if (!c) continue;
+      const k = eye === 'OD' ? -1 : 1;
+      const ax = 500 + k * (192 + pdOff), ay = 288, r = 73;
+      Object.assign(c.style, {
+        left: `${((ax - r) / 1000) * 100}%`, top: `${((ay - r) / 680) * 100}%`,
+        width: `${((2 * r) / 1000) * 100}%`, height: `${((2 * r) / 680) * 100}%`,
+        display: P.occ[eye] || !P.aperture ? 'none' : 'block',
+      });
+    }
+  }
 
   bind() {
     const el = this.el;

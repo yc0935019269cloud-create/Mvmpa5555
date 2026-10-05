@@ -1,4 +1,5 @@
-// 檢影小遊戲畫面:暗室裡一條光帶掃過眼睛,瞳孔內的反射光會「順動 / 逆動 / 中和」
+// 檢影畫面:暗室裡一條光帶掃過眼睛,瞳孔內的反射光會「順動 / 逆動 / 中和」
+// 同一份狀態(光條角度、掃動位置)可以畫在大畫面,也可以畫進綜合驗光儀的窺孔裡。
 import { reflex } from '../sim/retino.js';
 import { rad } from '../sim/optics.js';
 
@@ -6,9 +7,9 @@ const W = 520, H = 330;
 
 export class RetinoView {
   constructor(canvas, game) {
-    this.cv = canvas;
-    canvas.width = W; canvas.height = H;
-    this.ctx = canvas.getContext('2d');
+    this.cv = canvas ?? document.createElement('canvas');
+    this.cv.width = W; this.cv.height = H;
+    this.ctx = this.cv.getContext('2d');
     this.game = game;
     this.eye = 'OD';
     this.angle = 90; // 光條線的方向(度)
@@ -17,11 +18,13 @@ export class RetinoView {
     this.hintOn = game.mode !== 'exam'; // 顯示「順動/逆動」判讀(教學用)
     this.manualS = null;
     this.t = 0;
+    this.s = 0; // 光帶目前的掃動位置(-1.1 ~ 1.1)
     this.last = performance.now();
     this.info = null;
     this.running = false;
+    this.frameCbs = new Set(); // 每一幀畫完後通知(驗光儀窺孔跟著重畫)
     this.iris = ['#6b4a2f', '#4f7a8a', '#5d6f3f', '#7a5a3a'][game.patient.seed % 4];
-    this.bindPointer();
+    if (canvas) this.bindPointer();
   }
 
   bindPointer() {
@@ -59,13 +62,34 @@ export class RetinoView {
   }
   stop() { this.running = false; cancelAnimationFrame(this.raf); }
 
+  // 一幀:更新掃動位置 → 畫大畫面 → 通知窺孔重畫
   draw() {
-    const g = this.game, ctx = this.ctx;
-    const trueRx = g.trueRx(this.eye);
-    const info = (this.info = reflex(trueRx, g.lens(this.eye), g.wdD, this.angle));
+    const g = this.game;
+    this.s = this.manualS !== null ? this.manualS : Math.sin(this.t * 2 * Math.PI * 0.5) * 1.05;
+    this.info = reflex(g.trueRx(this.eye), g.lens(this.eye), g.wdD, this.angle);
+    this.scene(this.ctx, this.eye, { overlay: true, streak: true });
+    for (const cb of this.frameCbs) cb();
+  }
+
+  // 畫進驗光儀窺孔(方形 canvas,外觀由 CSS 裁成圓形)
+  paintAperture(canvas, eye) {
+    const size = canvas.width;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, size, size);
+    const f = size / 250; // 只取眼睛中央約 250 單位寬(虹膜 + 瞳孔)
+    ctx.setTransform(f, 0, 0, f, size / 2 - (W / 2) * f, size / 2 - (H / 2) * f);
+    this.scene(ctx, eye, { overlay: false, streak: eye === this.eye });
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  // 畫一隻眼睛的檢影場景。streak=false 時只畫靜止的眼睛(沒有被檢影的那一眼)
+  scene(ctx, eye, { overlay = true, streak = true } = {}) {
+    const g = this.game;
+    const info = streak ? (eye === this.eye && this.info ? this.info : reflex(g.trueRx(eye), g.lens(eye), g.wdD, this.angle)) : null;
     const cx = W / 2, cy = H / 2;
-    const s = this.manualS !== null ? this.manualS : Math.sin(this.t * 2 * Math.PI * 0.5) * 1.05;
-    const phi = rad(info.sweepDir);
+    const s = this.s;
+    const phi = rad(this.angle + 90);
     const th = rad(this.angle);
     const ux = Math.cos(phi), uy = -Math.sin(phi);
     const Rb = 125;
@@ -83,6 +107,7 @@ export class RetinoView {
     ctx.beginPath(); ctx.arc(cx, cy, 78, 0, Math.PI * 2); ctx.fillStyle = this.iris; ctx.globalAlpha = 0.55; ctx.fill(); ctx.globalAlpha = 1;
     ctx.beginPath(); ctx.arc(cx, cy, pupilR, 0, Math.PI * 2); ctx.fillStyle = '#050606'; ctx.fill();
     ctx.restore();
+    if (!streak) return;
 
     // 光條(打在臉上)
     const px = cx + ux * s * Rb, py = cy + uy * s * Rb;
@@ -116,6 +141,7 @@ export class RetinoView {
       }
     }
     ctx.restore();
+    if (!overlay) return;
 
     // 方向提示(字放大,手機縮小後仍讀得到)
     ctx.save();
@@ -125,7 +151,7 @@ export class RetinoView {
     ctx.beginPath(); ctx.arc(34 + ux * 38, H - 36 + uy * 38, 4.5, 0, Math.PI * 2); ctx.fill();
     ctx.fillText(`光條 ${Math.round(this.angle)}° · 掃動 ${Math.round(info.sweepDir)}°`, 86, H - 28);
     ctx.textAlign = 'right';
-    ctx.fillText(`${this.eye === 'OD' ? '右眼 OD' : '左眼 OS'} · ${g.wdCm} cm`, W - 14, 26);
+    ctx.fillText(`${eye === 'OD' ? '右眼 OD' : '左眼 OS'} · ${g.wdCm} cm`, W - 14, 26);
     ctx.textAlign = 'left';
     if (this.hintOn) {
       const txt = `${info.neutral ? '中和' : info.motion === 'with' ? '順動 → 加正' : '逆動 → 減正'}  (${info.r > 0 ? '+' : ''}${info.r.toFixed(2)}D)`;

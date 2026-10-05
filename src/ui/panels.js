@@ -324,7 +324,7 @@ export function buildRet(game, ctx) {
   let ang;
   const setAngle = (a) => { view.angle = ((a - 1 + 180) % 180) + 1; render(); };
   render();
-  return { el: root, render, onShow: () => view.start(), onHide: () => view.stop() };
+  return { el: root, render, onShow: () => { view.start(); ctx._face?.attachRetino(view); }, onHide: () => { view.stop(); ctx._face?.detachRetino(); } };
 }
 
 /* ============ 視力表 ============ */
