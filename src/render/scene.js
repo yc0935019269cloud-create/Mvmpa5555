@@ -11,12 +11,19 @@ const cap = (r, l, mat) => new THREE.Mesh(new THREE.CapsuleGeometry(r, l, 6, 14)
 
 export const STATIONS = {
   overview: { pos: [1.35, 1.9, 2.75], look: [-0.15, 0.95, -2.6], fov: 56 },
-  phoro: { pos: [0.3, 1.3, -0.82], look: [0, 1.18, 0], fov: 50 },
-  ret: { pos: [0.18, 1.27, -0.95], look: [0, 1.2, 0], fov: 40 },
+  phoro: { pos: [0.3, 1.36, -0.82], look: [0, 1.24, 0], fov: 50 },
+  ret: { pos: [0.18, 1.32, -0.95], look: [0, 1.25, 0], fov: 40 },
   chart: { pos: [0.12, 1.5, -3.95], look: [0, 1.36, -6.2], fov: 40 },
   desk: { pos: [0.5, 1.55, -0.35], look: [1.15, 0.8, -0.7], fov: 52 },
   patient: { pos: [0.9, 1.45, -0.7], look: [0, 1.15, 0.1], fov: 46 },
 };
+
+// 綜合驗光儀相對升降桌面的高度:桌高「適中」時,窺孔剛好對齊受測者的眼睛
+const EYE_Y = 1.265; // 受測者眼睛高度(頭 1.25 + 眼 0.015)
+const FACE_W = 0.36, FACE_H = FACE_W * (VB_H / VB_W);
+const AP_OFF = FACE_H / 2 - (288 / VB_H) * FACE_H; // 窺孔中心在驗光儀中心上方多少
+const tableY = (h) => 0.58 + h * 0.6;
+const PHORO_ABOVE = EYE_Y - AP_OFF - tableY(0.5);
 
 export class ClinicScene {
   constructor(container, game, chartCanvas, { onHotspot } = {}) {
@@ -249,11 +256,11 @@ export class ClinicScene {
   buildPhoropter() {
     const S = this.scene;
     const P = (this.phoro = new THREE.Group());
-    const FW = 0.36, FH = FW * (VB_H / VB_W); // 正面板尺寸(約 36 × 24 cm)
+    const FW = FACE_W, FH = FACE_H; // 正面板尺寸(約 36 × 24 cm)
     const ivory = new THREE.MeshPhongMaterial({ color: 0xd6d0c1, specular: 0x555555, shininess: 40 });
     const body = new THREE.Mesh(new THREE.BoxGeometry(FW - 0.01, FH - 0.012, 0.11), ivory); P.add(body);
     // 上方橫樑與背面圓殼,讓側面看起來有厚度
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(FW * 0.66, 0.045, 0.125), ivory); beam.position.set(0, FH / 2 - 0.02, 0.0); P.add(beam);
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(FW * 0.66, 0.045, 0.1), ivory); beam.position.set(0, FH / 2 - 0.02, 0.006); P.add(beam); // 退到正面板後面,不擋到面板
     for (const k of [-1, 1]) {
       const back = cyl(0.085, 0.085, 0.07, ivory, 40); back.rotation.x = Math.PI / 2; back.position.set(k * 0.1, -0.01, 0.075); P.add(back);
     }
@@ -269,10 +276,21 @@ export class ClinicScene {
     // 額靠(朝受測者)
     const rest = box(0.1, 0.035, 0.05, M(0x8da0a8)); rest.position.set(0, 0.04, 0.12); P.add(rest);
     const rod = cyl(0.008, 0.008, 0.1, M(0x8a979c)); rod.rotation.x = Math.PI / 2; rod.position.set(0, 0.04, 0.085); P.add(rod);
-    // 支撐臂
-    this.arm = box(0.05, 0.18, 0.05, M(0x6a777d, { metal: 0.4 })); this.arm.position.set(0, -0.2, 0.0); P.add(this.arm);
-    P.position.set(0, 1.18, -0.14);
+    // 吊掛桿(接到上方的支撐臂)
+    const hang = cyl(0.012, 0.012, 0.06, M(0x9aa5aa, { metal: 0.6, rough: 0.3 })); hang.position.set(0, FH / 2 + 0.03, 0.01); P.add(hang);
+    const hub = cyl(0.028, 0.028, 0.02, M(0x6a777d, { metal: 0.5, rough: 0.35 })); hub.position.set(0, FH / 2 + 0.06, 0.01); P.add(hub);
+    P.position.set(0, tableY(0.5) + PHORO_ABOVE, -0.14);
     S.add(P);
+    // 升降桌上的立柱 + 支撐臂:驗光儀從上方吊下來(跟著桌子升降)
+    const metal = M(0x8f9ca2, { metal: 0.55, rough: 0.35 });
+    const st = (this.stand = new THREE.Group());
+    const armY = PHORO_ABOVE + FH / 2 + 0.06;
+    const colX = 0.34, colZ = -0.5;
+    const column = cyl(0.03, 0.03, armY + 0.04, metal); column.position.set(colX, (armY + 0.04) / 2, colZ); st.add(column);
+    const cap0 = cyl(0.04, 0.04, 0.05, M(0x56636a, { metal: 0.4 })); cap0.position.set(colX, armY + 0.02, colZ); st.add(cap0);
+    const dx = 0 - colX, dz = -0.13 - colZ, len = Math.hypot(dx, dz);
+    const arm = box(len, 0.035, 0.05, metal); arm.position.set(colX + dx / 2, armY + 0.02, colZ + dz / 2); arm.rotation.y = -Math.atan2(dz, dx); st.add(arm);
+    S.add(st); // 世界座標;y 跟著桌面高度在 refresh() 更新
     this._faceTok = 0;
     this._faceSvg = '';
   }
@@ -334,7 +352,7 @@ export class ClinicScene {
     this.hotspotLayer.className = 'hotspots';
     this.container.appendChild(this.hotspotLayer);
     const defs = [
-      ['phoro', '綜合驗光儀', new THREE.Vector3(0, 1.4, -0.14), ['overview', 'phoro', 'ret', 'patient', 'desk']],
+      ['phoro', '綜合驗光儀', new THREE.Vector3(0, 1.47, -0.14), ['overview', 'phoro', 'ret', 'patient', 'desk']],
       ['chart', '視力表 · 6 m', new THREE.Vector3(0, 1.98, -6.2), ['overview', 'chart']],
       ['sheet', '紀錄單', new THREE.Vector3(1.08, 0.9, -0.62), ['overview', 'desk', 'phoro']],
       ['ret', '檢影鏡', new THREE.Vector3(1.28, 0.9, -0.82), ['overview', 'desk']],
@@ -385,10 +403,11 @@ export class ClinicScene {
     const g = this.game;
     const P = g.phoro;
     // 桌高 → 驗光儀高度
-    const ty = 0.58 + P.height * 0.6;
+    const ty = tableY(P.height);
     this.table.children[0].position.y = ty; // tableTop
     this.tableCol.scale.y = ty; this.tableCol.position.y = ty / 2;
-    this.phoro.position.y = ty + 0.3;
+    this.stand.position.y = ty;
+    this.phoro.position.y = ty + PHORO_ABOVE;
     // 水平
     this.phoro.rotation.z = (P.level * Math.PI) / 180;
     // 燈光
@@ -411,6 +430,9 @@ export class ClinicScene {
   updateHotspots() {
     const step = this.game.stepId;
     const setup = step === 'setup';
+    // 前置項目做完的熱點打勾
+    const st = setup ? this.game.setupState() : {};
+    const done = { sanitize: st.sanitize, switch: st.dim, table: st.height, pd: st.pd };
     for (const h of this.hotspots) {
       let show = h.stations.includes(this.station);
       if (['switch', 'table', 'sanitize', 'pd'].includes(h.id)) show = show && setup;
@@ -418,6 +440,7 @@ export class ClinicScene {
       else if (h.id === 'ret') show = show && (step === 'ret' || step === 'wd' || this.game.mode !== 'exam');
       h.visible = show;
       h.el.style.display = show ? '' : 'none';
+      h.el.classList.toggle('done', !!done[h.id]);
     }
   }
 

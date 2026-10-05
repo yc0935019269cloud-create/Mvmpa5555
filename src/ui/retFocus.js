@@ -5,6 +5,7 @@ import { PhoropterFace } from './phoropterFace.js';
 import { EYES, EYE_LABEL } from '../game/state.js';
 import { WD_OPTIONS } from '../sim/retino.js';
 import { fmtRx, fmtSph } from '../sim/optics.js';
+import { wdButtons } from './panels.js';
 
 const pad3 = (n) => String(Math.round(n)).padStart(3, '0');
 
@@ -110,18 +111,13 @@ export function openRetFocus(game, ctx, { onClose } = {}) {
   function renderBottom() {
     const stepId = game.stepId;
     const acts = [];
-    const c = game.canAdvance();
+    const ready = game.mode === 'tutorial' && game.canAdvance().ok;
     if (stepId === 'ret') {
-      acts.push(btn('完成檢影 ▶ 進工作距離', () => finish(), { cls: 'primary big wide' }));
+      acts.push(btn('完成檢影 ▶ 進工作距離', () => finish(), { cls: `primary big wide${ready ? ' go' : ''}` }));
     } else {
-      acts.push(
-        btn(`進工作距離 −${game.wdD.toFixed(2)}D`, () => game.applyWD(), { cls: 'big', disabled: game.wdApplied }),
-        btn('記錄 OD', () => { game.recordRx('ret', 'OD'); ctx.toast('已記錄 OD'); }, { cls: 'big' }),
-        btn('記錄 OS', () => { game.recordRx('ret', 'OS'); ctx.toast('已記錄 OS'); }, { cls: 'big' }),
-        btn(`記錄 ${game.wdCm} cm`, () => { game.recordWD(game.wdCm); ctx.toast('已記錄工作距離'); }, { cls: 'big' }));
-      if (stepId === 'wd') acts.push(btn('完成 ▶ 測 VA', () => finish(), { cls: 'primary big wide' }));
+      acts.push(...wdButtons(game, ctx.toast, 'big'));
+      if (stepId === 'wd') acts.push(btn('完成 ▶ 測 VA', () => finish(), { cls: `primary big wide${ready ? ' go' : ''}` }));
     }
-    void c;
     bottom.replaceChildren(...acts);
   }
 
@@ -142,7 +138,9 @@ export function openRetFocus(game, ctx, { onClose } = {}) {
     autoBtn.textContent = view.auto ? '⏸ 暫停掃動' : '▶ 自動掃動';
     slowBtn.textContent = view.slow ? '慢動作 ✓' : '慢動作';
     hintBtn.textContent = view.hintOn ? '💡 ✓' : '💡';
-    eyeSeg.replaceChildren(...EYES.map((e) => h('button', { type: 'button', class: `s${view.eye === e ? ' on' : ''}`, onclick: () => { view.eye = e; g.setActiveEye(e); sync(); } }, e === 'OD' ? 'OD 右' : 'OS 左')));
+    // 教學提示開著時,已中和的那一眼打勾(考試模式不顯示)
+    const nOk = (e) => g.mode !== 'exam' && view.hintOn && g.retNeutral(e, 0.25);
+    eyeSeg.replaceChildren(...EYES.map((e) => h('button', { type: 'button', class: `s${view.eye === e ? ' on' : ''}${nOk(e) ? ' neut' : ''}`, title: nOk(e) ? '兩個軸都已中和' : '', onclick: () => { view.eye = e; g.setActiveEye(e); sync(); } }, `${e === 'OD' ? 'OD 右' : 'OS 左'}${nOk(e) ? ' ✓' : ''}`)));
     face?.update();
     renderBottom();
   }

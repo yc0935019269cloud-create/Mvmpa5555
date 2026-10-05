@@ -1,7 +1,7 @@
 // 操作台的各個分頁:前置 / 驗光台 / 檢影 / 視力表 / 紀錄單 / 對話 / 速查
 import { h, btn, segmented, fmt2 } from './dom.js';
 import {
-  SETUP_ITEMS, EYES, EYE_LABEL, other,
+  SETUP_ITEMS, EYES, EYE_LABEL, other, rxKey,
 } from '../game/state.js';
 import { VA_ROWS, fmtRx, fmtSph, jccRedAxis, snellen, mod180 } from '../sim/optics.js';
 import { WD_OPTIONS } from '../sim/retino.js';
@@ -57,13 +57,18 @@ export function buildSetup(game, ctx) {
     const P = game.phoro;
     const row = (id, label, controls, note) => {
       const ok = st[id];
-      return h('div', { class: `chk${ok ? ' ok' : ''}` },
+      return h('div', { class: `chk${ok ? ' ok' : ''}`, 'data-id': id },
         h('div', { class: 'chk-h' }, h('span', { class: 'mark', 'aria-hidden': 'true' }, ok ? '✓' : '○'), h('b', {}, label)),
         h('div', { class: 'chk-b' }, controls, note ? h('p', { class: 'note' }, note) : null));
     };
     const heightTxt = Math.abs(P.height - 0.5) <= 0.07 ? '高度適中' : P.height < 0.5 ? '偏低' : '偏高';
+    const nDone = SETUP_ITEMS.filter((it) => st[it.id]).length;
     fillA(root,
-      h('p', { class: 'lead' }, '考試前置:儀器、位置、光線都設好,再開始檢查。每一項都要真的做到才會打勾。'),
+      h('div', { class: 'progline' },
+        h('b', {}, `前置 ${nDone} / ${SETUP_ITEMS.length}`),
+        h('div', { class: 'tr' }, h('div', { class: 'fi', style: { width: `${(nDone / SETUP_ITEMS.length) * 100}%` } })),
+        nDone === SETUP_ITEMS.length ? h('span', { class: 'okt' }, '✓ 全部完成') : null),
+      h('p', { class: 'lead' }, '儀器、位置、光線都設好,再開始檢查。每一項都要真的做到才會打勾;也可以點 3D 診間裡的黃色熱點。'),
       row('sanitize', '儀器消毒', btn(game.room.sanitized ? '已消毒' : '擦拭消毒', () => game.sanitize(), { disabled: game.room.sanitized })),
       row('pd', 'PD:量遠方瞳距 → 設定到綜合驗光儀',
         h('div', { class: 'row wrap' },
@@ -103,7 +108,14 @@ export function buildSetup(game, ctx) {
   }
   let out, out2;
   render();
-  return { el: root, render };
+  // 從 3D 熱點跳過來:捲到那一項並閃一下
+  function focus(id) {
+    const el = root.querySelector(`[data-id="${id}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  }
+  return { el: root, render, focus };
 }
 
 /* ============ 鏡片控制(驗光台與檢影共用) ============ */
@@ -155,12 +167,19 @@ export function recordBar(game) {
   const vaSel = (id, val) => h('select', { id, 'aria-label': id }, VA_ROWS.map((r) => h('option', { value: r, selected: r === val }, `${r.toFixed(1)}`)));
   const deltaSel = (id, val) => h('select', { id, 'aria-label': id }, [-3, -2, -1, 0, 1, 2, 3].map((d) => h('option', { value: d, selected: d === val }, d > 0 ? `+${d}` : d === 0 ? '±0' : `−${Math.abs(d)}`)));
   const cur = (slot) => S.va[slot]?.[eye];
+  // 預設值 = 「目前鏡片」在這一步實際讀到的最佳列(沒讀過就用目前視標列)
+  const rs = readsNow(game, eye);
+  const g0 = guessVA(rs.filter((r) => !r.ph));
+  const gPH = guessVA(rs.filter((r) => r.ph));
   if (ph === 'va') {
     const c = cur('ret');
+    const row0 = g0?.row ?? c?.row ?? game.chart.row;
+    const phRow0 = gPH?.row ?? c?.phRow ?? null;
     fillA(bar,
-      h('div', { class: 'row wrap' }, h('span', { class: 'lab' }, 'VA'), vaSel('va_row', c?.row ?? 0.8), deltaSel('va_d', c?.delta ?? 0),
-        h('span', { class: 'lab' }, 'PH'), h('select', { id: 'ph_row', 'aria-label': 'PH' }, [h('option', { value: '' }, '—'), ...VA_ROWS.map((r) => h('option', { value: r, selected: c?.phRow === r }, r.toFixed(1)))]), deltaSel('ph_d', c?.phDelta ?? 0)),
-      btn(`記錄 ${eye} 的 VA → 紀錄單 ①`, () => {
+      readsLine(rs),
+      h('div', { class: 'row wrap' }, h('span', { class: 'lab' }, 'VA'), vaSel('va_row', row0), deltaSel('va_d', g0?.delta ?? c?.delta ?? 0),
+        h('span', { class: 'lab' }, 'PH'), h('select', { id: 'ph_row', 'aria-label': 'PH' }, [h('option', { value: '' }, '—'), ...VA_ROWS.map((r) => h('option', { value: r, selected: phRow0 === r }, r.toFixed(1)))]), deltaSel('ph_d', gPH?.delta ?? c?.phDelta ?? 0)),
+      btn(`${c ? '✓ 已記錄 · 再記一次' : `記錄 ${eye} 的 VA → 紀錄單 ①`}`, () => {
         const q = (id) => bar.querySelector('#' + id).value;
         const phRow = q('ph_row');
         game.recordVA('ret', eye, { row: +q('va_row'), delta: +q('va_d'), phRow: phRow ? +phRow : null, phDelta: phRow ? +q('ph_d') : 0 });
@@ -170,12 +189,13 @@ export function recordBar(game) {
     const slot = SLOT_BY_PHASE[ph];
     const label = { mp1: '② 1st MPMVA', jcc: '③ JCC', mp2: '④ 2nd MPMVA' }[slot];
     const has = S.slots[slot][eye];
-    fillA(bar,h('div', { class: 'row wrap' }, btn(`記錄度數 → ${label}`, () => { game.recordRx(slot, eye); ctxToast('已記錄度數'); }, { cls: 'primary' }),
+    const same = has && game.lensKey(eye) === rxKey(has.rx);
+    fillA(bar, h('div', { class: 'row wrap' }, btn(has ? (same ? '✓ 已記錄目前度數' : '度數改過了 · 重新記錄') : `記錄度數 → ${label}`, () => { game.recordRx(slot, eye); ctxToast('已記錄度數'); }, { cls: same ? 'on' : 'primary' }),
       has ? h('span', { class: 'rx small' }, fmtRx(has.rx)) : null));
     if (slot !== 'jcc') {
       const c = cur(slot);
-      fillA(bar,h('div', { class: 'row wrap' }, h('span', { class: 'lab' }, 'VA'), vaSel('va_row', c?.row ?? 1.0), deltaSel('va_d', c?.delta ?? 0),
-        btn('記錄 VA', () => {
+      fillA(bar, readsLine(rs), h('div', { class: 'row wrap' }, h('span', { class: 'lab' }, 'VA'), vaSel('va_row', g0?.row ?? c?.row ?? game.chart.row), deltaSel('va_d', g0?.delta ?? c?.delta ?? 0),
+        btn(c ? '✓ 再記一次 VA' : '記錄 VA', () => {
           const q = (id) => bar.querySelector('#' + id).value;
           game.recordVA(slot, eye, { row: +q('va_row'), delta: +q('va_d') });
           ctxToast('已記錄 VA');
@@ -187,6 +207,34 @@ export function recordBar(game) {
 }
 
 let ctxToast = () => {};
+
+// 這一步、目前鏡片、只開測試眼時讀過的視標(記錄 VA 的依據)
+export function readsNow(game, eye) {
+  const key = game.lensKey(eye);
+  return game.hist[eye].reads.filter((r) => r.step === game.stepId && r.lens === key && r.isolated);
+}
+function guessVA(list) {
+  const full = list.filter((r) => r.correct === r.total).map((r) => r.row);
+  if (!full.length) return null;
+  const row = Math.max(...full);
+  const next = VA_ROWS[VA_ROWS.indexOf(row) + 1];
+  const part = list.filter((r) => r.row === next && r.correct > 0 && r.correct < r.total).pop();
+  return { row, delta: part ? Math.min(3, part.correct) : 0 };
+}
+function readsLine(rs) {
+  if (!rs.length) return h('p', { class: 'note warnline' }, '目前的鏡片還沒請受測者(只開測試眼)讀過視標,先問再記。');
+  const fmt = (r) => `${r.ph ? 'PH ' : ''}${r.row.toFixed(1)} ${r.correct}/${r.total}`;
+  const seen = new Map();
+  for (const r of rs) seen.set(`${r.ph}-${r.row}`, r); // 同一列只留最後一次
+  return h('p', { class: 'note' }, '目前鏡片讀過:', [...seen.values()].map((r) => h('span', { class: `rd${r.correct === r.total ? ' ok' : ''}` }, fmt(r))));
+}
+
+// 選散光路線時,順便把視標換成那條路要用的
+export function pickPath(game, p) {
+  game.choosePath(p);
+  if (p === 'clock') game.setChart({ mode: 'clock' });
+  else if (game.chart.mode === 'clock') game.setChart({ mode: 'honey' });
+}
 
 // 「精確按鈕調整」收合區:記住展開狀態,不會因為每次重繪就收起來
 function foldBox(ctx, content) {
@@ -263,16 +311,24 @@ function pathPicker(game) {
   const c = game.phoro[eye].c;
   return h('div', { class: 'path' },
     h('p', { class: 'note' }, `散光路線(目前驗光儀散光 ${c === 0 ? '0' : fmt2(c)}DC):≥ −0.75DC 走 APA;0 ~ −0.50DC 走 PPAP;或用鐘面圖。`),
-    segmented([['APA', 'APA'], ['PPAP', 'PPAP'], ['clock', '鐘面圖'], ['skip', '不需要']], cur, (p) => game.choosePath(p)));
+    segmented([['APA', 'APA'], ['PPAP', 'PPAP'], ['clock', '鐘面圖'], ['skip', '不需要']], cur, (p) => pickPath(game, p)));
+}
+
+// 進工作距離 + 記錄的按鈕(驗光台、檢影分頁、專注模式共用),做過的打勾
+export function wdButtons(game, toast, cls = '') {
+  const S = game.sheet;
+  const done = (e) => S.slots.ret[e] && game.lensKey(e) === rxKey(S.slots.ret[e].rx);
+  return [
+    btn(game.wdApplied ? `✓ 已進工作距離 −${game.wdD.toFixed(2)}D` : `① 雙眼給工作距離 −${game.wdD.toFixed(2)}D`, () => game.applyWD(), { cls: `${cls} ${game.wdApplied ? 'on' : 'primary'}`, disabled: game.wdApplied }),
+    ...EYES.map((e) => btn(done(e) ? `✓ ${e} 已記錄` : `② 記錄 ${e} 度數`, () => { game.recordRx('ret', e); toast(`已記錄 ${e}:${fmtRx(game.lens(e))}`); }, { cls: `${cls} ${done(e) ? 'on' : ''}` })),
+    btn(S.wdCm === game.wdCm ? `✓ 工作距離 ${game.wdCm} cm` : `③ 記錄工作距離 ${game.wdCm} cm`, () => { game.recordWD(game.wdCm); toast('已記錄工作距離'); }, { cls: `${cls} ${S.wdCm === game.wdCm ? 'on' : ''}` }),
+  ];
 }
 
 function wdRecord(game) {
   return h('div', { class: 'recbar' },
-    h('div', { class: 'row wrap' },
-      btn(`雙眼給工作距離 −${game.wdD.toFixed(2)}D`, () => game.applyWD(), { cls: 'primary', disabled: game.wdApplied }),
-      btn('記錄 OD 度數 → ①', () => { game.recordRx('ret', 'OD'); ctxToast('已記錄 OD'); }),
-      btn('記錄 OS 度數 → ①', () => { game.recordRx('ret', 'OS'); ctxToast('已記錄 OS'); }),
-      btn(`記錄工作距離 ${game.wdCm} cm`, () => { game.recordWD(game.wdCm); ctxToast('已記錄工作距離'); })));
+    !game.wdApplied ? h('p', { class: 'note' }, '順序:先雙眼給工作距離度數,再把兩眼度數與工作距離記到紀錄單 ①。') : null,
+    h('div', { class: 'row wrap' }, wdButtons(game, ctxToast)));
 }
 
 function godBox(game) {
@@ -314,11 +370,7 @@ export function buildRet(game, ctx) {
           segmented(WD_OPTIONS.map((o) => [o.cm, `${o.cm} cm${o.note ? '·' + o.note : ''}`]), game.wdCm, (cm) => game.setWD(cm))),
         h('p', { class: 'note' }, `目前 ${game.wdCm} cm = ${game.wdD.toFixed(2)}D。距離越短,工作距離度數越大(25 cm = 4.00D),進工作距離時要扣對度數。`),
         h('p', { class: 'note' }, `兩眼都中和後,雙眼同時給工作距離的度數(= −${game.wdD.toFixed(2)}D),並把 Ret 度數與工作距離記錄下來。`),
-        h('div', { class: 'row wrap' },
-          btn(`雙眼給工作距離 −${game.wdD.toFixed(2)}D`, () => game.applyWD(), { cls: 'primary', disabled: game.wdApplied }),
-          btn('記錄 OD → ①', () => { game.recordRx('ret', 'OD'); ctx.toast('已記錄 OD'); }),
-          btn('記錄 OS → ①', () => { game.recordRx('ret', 'OS'); ctx.toast('已記錄 OS'); }),
-          btn(`記錄工作距離 ${game.wdCm} cm`, () => { game.recordWD(game.wdCm); ctx.toast('已記錄工作距離'); }))),
+        h('div', { class: 'row wrap' }, wdButtons(game, ctx.toast))),
     );
   }
   let ang;
@@ -469,6 +521,15 @@ export function buildHelp() {
   <ul>
    <li>順加逆減:順動加正、逆動減正(或加負)。先中和第一軸,再轉 90° 中和第二軸。</li>
    <li>最後雙眼同時給工作距離度數(67 cm = −1.50D),並記錄。</li>
+  </ul>
+  <h4 class="kbdh">鍵盤快捷鍵(電腦版)</h4>
+  <ul class="keys">
+   <li><kbd>空白鍵</kbd> 問受測者(讀視標 / 紅綠 / JCC 1 或 2 / 鐘面圖,依步驟)</li>
+   <li><kbd>←</kbd> <kbd>→</kbd> 球面 −0.25 / +0.25;<kbd>Shift</kbd> + ←→ 一次 1.00D</li>
+   <li><kbd>↑</kbd> <kbd>↓</kbd> 視標列 變大 / 變小</li>
+   <li><kbd>Z</kbd> <kbd>X</kbd> 兩片比較(再加 −0.25 / 退 +0.25)</li>
+   <li><kbd>F</kbd> JCC 翻轉;<kbd>J</kbd> JCC 關 → A → P;<kbd>[</kbd> <kbd>]</kbd> 軸 −5 / +5;<kbd>-</kbd> <kbd>=</kbd> 散光 加 −0.25 / 退 +0.25</li>
+   <li><kbd>O</kbd> 只開測試眼(遮另一眼);<kbd>R</kbd> 記錄;<kbd>Enter</kbd> 完成此步驟</li>
   </ul>
   <h4>VA</h4>
   <ul><li>關掉另一隻眼,從 0.6–0.8 開始問;&lt; 0.8 要加測 PH 並註記,測完把 PH 轉開。</li></ul>`;

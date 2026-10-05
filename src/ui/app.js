@@ -6,7 +6,8 @@ import { drawChart, CHART_W, CHART_H } from '../render/chartCanvas.js';
 import { ClinicScene } from '../render/scene.js';
 import { fmtRx } from '../sim/optics.js';
 import { faces } from './phoropterFace.js';
-import { buildQuickbar } from './quickbar.js';
+import { buildQuickbar, openRecordSheet, recordDone, mainAsk, cycleJcc } from './quickbar.js';
+import { fx, tick } from './feedback.js';
 import { openRetFocus } from './retFocus.js';
 import {
   buildSetup, buildPhoro, buildRet, buildChartPanel, buildSheet, buildLog, buildHelp,
@@ -14,6 +15,7 @@ import {
 
 const fill = (el, ...kids) => { el.replaceChildren(...kids.flat(Infinity).filter((k) => k !== null && k !== undefined && k !== false)); return el; };
 const BEST_KEY = 'optom3d-best-v1';
+const GUIDE_KEY = 'optom3d-guide-v1';
 const loadBest = () => { try { return JSON.parse(localStorage.getItem(BEST_KEY) || '{}'); } catch { return {}; } };
 const saveBest = (mode, s) => { try { const b = loadBest(); if (!b[mode] || s > b[mode]) { b[mode] = s; localStorage.setItem(BEST_KEY, JSON.stringify(b)); return true; } } catch { /* ignore */ } return false; };
 
@@ -88,6 +90,9 @@ export class App {
   teardown() {
     this.rf?.close?.(false);
     this.rf = null;
+    this.recClose?.();
+    this.recClose = null;
+    if (this.onKey) { document.removeEventListener('keydown', this.onKey); document.removeEventListener('pointerdown', this.onPtr, true); this.onKey = null; }
     this.scene?.dispose?.();
     this.scene = null;
     clearInterval(this.timerId);
@@ -135,7 +140,7 @@ export class App {
       this.scene = new FlatScene(glwrap);
     }
 
-    const ctx = { toast: (t, warn) => this.toast(t, warn), ask: (fn) => this.ask(fn), showTab: (t) => this.showTab(t), openRetFocus: () => this.openFocus() };
+    const ctx = { toast: (t, warn) => this.toast(t, warn), ask: (fn) => this.ask(fn), showTab: (t) => this.showTab(t), openRetFocus: () => this.openFocus(), openRecord: () => this.openRecord() };
     this.ctx = ctx;
     this.panels = {
       setup: buildSetup(game, ctx),
@@ -160,12 +165,83 @@ export class App {
     this.repaintChart();
     this.timerId = setInterval(() => this.renderTimer(), 500);
     this.renderTimer();
+    this.phoroSig = this.sig();
+    this.onKey = (e) => this.key(e);
+    this.onPtr = () => { this.tabNav = false; };
+    document.addEventListener('keydown', this.onKey);
+    document.addEventListener('pointerdown', this.onPtr, true);
     // 開場提示
     this.showBubble('sys', '系統', `受測者 ${game.patient.name}(${game.patient.age} 歲)已就座。先完成前置檢查。`);
+    if (opts.mode === 'tutorial') this.maybeGuide();
+  }
+
+  // 第一次玩教學模式:30 秒看懂怎麼操作
+  maybeGuide() {
+    try { if (localStorage.getItem(GUIDE_KEY)) return; } catch { /* ignore */ }
+    const touch = window.matchMedia('(pointer: coarse)').matches;
+    const ov = h('div', { class: 'overlay glass guide' }, h('div', { class: 'card small' },
+      h('h2', {}, '30 秒上手'),
+      h('ol', { class: 'guide-list' },
+        h('li', {}, h('b', {}, '左上角步驟卡'), ':告訴你這一步要做什麼,清單全部打勾 ✓ 就按「完成此步驟」。'),
+        h('li', {}, h('b', {}, '黃色熱點 / 下方視角列'), ':點 3D 診間裡的儀器就能操作;拖曳畫面可以左右看。'),
+        h('li', {}, h('b', {}, '綜合驗光儀'), touch ? ':用手指轉旋鈕,或點旋鈕左半(−)/右半(+)。' : ':拖曳旋鈕轉動、點左半(−)/右半(+),滑鼠滾輪也可以。'),
+        h('li', {}, h('b', {}, '底部常用操作列'), ':遮眼、問受測者、調度數、記錄都在這裡,受測者的回答也會顯示在上面。'),
+        touch ? null : h('li', {}, h('b', {}, '鍵盤'), ':空白鍵 = 問受測者,←→ = 球面 ±0.25,↑↓ = 視標大小,Enter = 完成此步驟(其餘見「速查」)。')),
+      h('div', { class: 'startrow' }, btn('開始 ▶', () => { try { localStorage.setItem(GUIDE_KEY, '1'); } catch { /* ignore */ } ov.remove(); }, { cls: 'primary' }))));
+    document.body.append(ov);
+  }
+
+  openRecord() {
+    this.recClose?.();
+    const close = openRecordSheet(this.game);
+    this.recClose = () => { close(); this.recClose = null; };
+  }
+
+  // 驗光儀的鏡片 / 輔助鏡 / JCC 狀態:變了就「喀」一聲
+  sig() {
+    const P = this.game.phoro;
+    return ['OD', 'OS'].map((e) => `${P[e].s},${P[e].c},${P[e].a},${P[e].aux}`).join('|') + `|${P.jcc.mode}${P.jcc.pos}|${P.occ.OD}${P.occ.OS}|${P.aperture}`;
+  }
+
+  /* ---------------- 鍵盤快捷鍵(電腦版) ---------------- */
+  key(e) {
+    const g = this.game;
+    if (!g || e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.isContentEditable || /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName))) return;
+    if (document.querySelector('.overlay') || this.rf) return; // 選單、結果、記錄視窗、檢影專注模式開著時不攔截
+    // 用 Tab 移到按鈕上時,空白鍵 / Enter 照常按那顆按鈕;滑鼠點過的按鈕則不搶走快捷鍵
+    if (e.key === 'Tab') { this.tabNav = true; return; }
+    if ((e.key === ' ' || e.key === 'Enter') && this.tabNav && t?.matches?.('button, a, summary')) return;
+    const eye = g.activeEye;
+    const k = e.key;
+    const run = (fn) => { e.preventDefault(); t?.blur?.(); fn(); };
+    switch (k) {
+      case ' ': { const f = mainAsk(g); if (f) run(() => this.ask(f)); else e.preventDefault(); break; }
+      case 'ArrowLeft': run(() => g.stepSph(eye, e.shiftKey ? -1 : -0.25)); break;
+      case 'ArrowRight': run(() => g.stepSph(eye, e.shiftKey ? 1 : 0.25)); break;
+      case 'ArrowUp': run(() => g.stepRow(-1)); break;
+      case 'ArrowDown': run(() => g.stepRow(1)); break;
+      case 'z': case 'Z': run(() => this.ask(() => g.askCompare(-0.25))); break;
+      case 'x': case 'X': run(() => this.ask(() => g.askCompare(0.25))); break;
+      case 'f': case 'F': run(() => g.flipJcc()); break;
+      case 'j': case 'J': run(() => cycleJcc(g)); break;
+      case '[': run(() => g.stepAxis(eye, -5)); break;
+      case ']': run(() => g.stepAxis(eye, 5)); break;
+      case '-': run(() => g.stepCyl(eye, -0.25)); break;
+      case '=': case '+': run(() => g.stepCyl(eye, 0.25)); break;
+      case 'o': case 'O': run(() => g.setTestEye(eye)); break;
+      case 'r': case 'R': if (recordDone(g) !== null) run(() => this.openRecord()); break; // 紅綠步驟沒有要記錄的
+      case 'Enter': run(() => this.tryAdvance()); break;
+      default: break;
+    }
   }
 
   onGame(kind) {
     const g = this.game;
+    const sg = this.sig();
+    if (sg !== this.phoroSig) { this.phoroSig = sg; tick(); }
+    if (kind === 'step') { this.hintText = null; this.showWhy = false; }
     this.scene?.refresh();
     if (kind === 'slider') return;
     if (window.__pfDrag) { for (const f of faces) f.update(); return; } // 旋鈕拖曳中:只更新驗光儀,放開後再整體刷新
@@ -192,6 +268,7 @@ export class App {
     const g = this.game;
     const id = g.stepDef.phase ?? g.stepId;
     const want = { setup: 'setup', ret: 'ret', wd: 'phoro', va: 'phoro', mp1: 'phoro', duo: 'phoro', jcc: 'phoro', mp2: 'phoro', done: 'phoro' }[id];
+    if (id !== 'ret' && id !== 'wd' && this.rf) this.rf.close(false); // 離開檢影 / 工作距離就收起專注模式
     if (g.stepId === 'done') { setTimeout(() => this.showResult(), 500); return; }
     if (id === 'ret') this.rfDismissed = false;
     if (want && (want !== this.tab || (want === 'ret' && !this.rf))) this.showTab(want);
@@ -229,6 +306,7 @@ export class App {
     return h('div', { class: 'menu-pop' },
       g.mode !== 'exam' ? h('button', { type: 'button', onclick: close(() => { g.god = !g.god; g.emit(); }) }, g.god ? '關閉上帝視角提示' : '開啟上帝視角提示') : null,
       h('button', { type: 'button', onclick: close(() => this.showTab('log')) }, '對話紀錄'),
+      h('button', { type: 'button', onclick: close(() => { fx.sound = !fx.sound; if (fx.sound) tick(true); }) }, fx.sound ? '🔊 旋鈕音效:開' : '🔈 旋鈕音效:關'),
       h('hr'),
       h('button', { type: 'button', onclick: close(() => this.start({ ...this.opts, seed: g.seed })) }, '重來這位受測者'),
       h('button', { type: 'button', onclick: close(() => { this.opts.seed = Math.floor(Math.random() * 90000) + 1; this.start(this.opts); }) }, '換一位受測者'),
@@ -254,36 +332,61 @@ export class App {
   }
 
   /* ---------------- 步驟卡 ---------------- */
+  tryAdvance() {
+    const g = this.game;
+    if (g.stepId === 'done') return;
+    if (g.mode === 'tutorial' && !g.canAdvance().ok) { this.showWhy = true; this.cardMin = false; this.renderCard(); this.toast('還沒達成這一步的條件', true); return; }
+    this.hintText = null; this.showWhy = false;
+    g.advance();
+  }
+
+  // 條件少就全列;多(前置 9 項)就只列進度 + 接下來的兩項,避免步驟卡蓋住 3D 熱點
+  condList(conds, failed) {
+    const nOk = conds.filter((c) => c.ok).length;
+    const li = (c) => h('li', { class: c.ok ? 'ok' : '' }, h('i', { 'aria-hidden': 'true' }, c.ok ? '✓' : ''), c.label);
+    if (conds.length <= 4) return h('ul', { class: `conds${failed ? ' failed' : ''}` }, conds.map(li));
+    const left = conds.filter((c) => !c.ok);
+    return h('div', { class: 'condsum' },
+      h('div', { class: 'progline' }, h('b', {}, `${nOk} / ${conds.length}`), h('div', { class: 'tr' }, h('div', { class: 'fi', style: { width: `${(nOk / conds.length) * 100}%` } }))),
+      left.length ? h('ul', { class: `conds${failed ? ' failed' : ''}` }, (failed ? left : left.slice(0, 2)).map(li), !failed && left.length > 2 ? h('li', { class: 'more' }, `…還有 ${left.length - 2} 項`) : null) : null);
+  }
+
   renderCard() {
     const g = this.game;
     const def = g.stepDef;
     const idx = g.step;
     const total = STEPS.length - 1;
-    const c = g.canAdvance();
     const key = def.phase ?? def.id;
     const showHint = g.mode !== 'exam';
-    const dots = STEPS.slice(0, -1).map((s, i) => h('i', { class: i < idx ? 'done' : i === idx ? 'now' : '' }));
-    this.stepcard.classList.toggle('min', this.cardMin);
     const last = g.stepId === 'done';
+    // 即時過關清單(教學 / 自由練習);考試模式不顯示
+    const conds = showHint && !last ? g.conditions() : [];
+    const nOk = conds.filter((c) => c.ok).length;
+    const ready = conds.length > 0 && nOk === conds.length;
+    const dots = STEPS.slice(0, -1).map((s, i) => h('i', { class: `${i < idx ? 'done' : i === idx ? 'now' : ''}${i === 3 || i === 8 ? ' gap' : ''}`, title: `${i + 1}. ${s.eye ? s.eye + ' · ' : ''}${s.title}` }));
+    this.stepcard.classList.toggle('min', this.cardMin);
+    this.stepcard.classList.toggle('ready', ready);
     const acts = [
-      showHint ? btn('💡 提示', () => { this.hintText = g.hint(); this.cardMin = false; this.renderCard(); }, { cls: 'sm' }) : null,
-      last ? null : btn(idx === total - 1 ? '完成並結算 ▶' : '完成此步驟 ▶', () => {
-        if (g.mode === 'tutorial' && !g.canAdvance().ok) { this.showWhy = true; this.cardMin = false; this.renderCard(); this.toast('還沒達成這一步的條件', true); return; }
-        this.hintText = null; this.showWhy = false;
-        g.advance();
-      }, { cls: 'primary' }),
+      showHint ? btn(this.cardMin ? '💡' : '💡 提示', () => { this.hintText = g.hint(); this.cardMin = false; this.renderCard(); }, { cls: 'sm', aria: '提示' }) : null,
+      last ? null : btn(`${idx === total - 1 ? '完成並結算' : '完成此步驟'}${this.cardMin && conds.length ? `(${nOk}/${conds.length})` : ''} ▶`, () => this.tryAdvance(), { cls: `primary${ready ? ' go' : ''}`, title: 'Enter' }),
     ];
     const toggle = h('button', { class: 'b sm ghost', type: 'button', 'aria-label': this.cardMin ? '展開' : '收合', onclick: () => { this.cardMin = !this.cardMin; this.renderCard(); } }, this.cardMin ? '▾' : '▴');
+    const failed = g.mode === 'tutorial' && this.showWhy;
+    const nextC = conds.find((c) => !c.ok);
     fill(this.stepcard,
       h('div', { class: 'sc-top' },
         h('span', { class: 'no' }, last ? '完成' : `${idx + 1}/${total}`),
         h('h3', {}, `${def.eye ? EYE_LABEL[def.eye] + ' · ' : ''}${def.title}`),
-        this.cardMin ? h('div', { class: 'acts' }, acts) : null,
         toggle),
+      // 收合時:第二行 = 下一個還沒做到的條件 + 按鈕
+      this.cardMin ? h('div', { class: 'minrow' },
+        h('span', { class: `nextc${ready ? ' ok' : ''}` }, ready ? '✓ 條件都達成了' : nextC ? `下一步:${nextC.label}` : ''),
+        h('div', { class: 'acts' }, acts)) : null,
       h('div', { class: 'dots' }, dots),
-      h('p', { class: 'goal' }, g.mode === 'exam' ? '考試模式:沒有提示。' : STEP_GOAL[key] ?? ''),
-      this.hintText ? h('p', { class: 'goal', style: { color: '#1e5566', fontWeight: 600 } }, this.hintText) : null,
-      g.mode === 'tutorial' && !c.ok && this.showWhy ? h('div', { class: 'why' }, h('ul', {}, c.why.map((w) => h('li', {}, w)))) : null,
+      h('p', { class: 'goal' }, g.mode === 'exam' ? '考試模式:沒有提示,照你的流程做。' : STEP_GOAL[key] ?? ''),
+      conds.length ? this.condList(conds, failed) : null,
+      this.hintText ? h('p', { class: 'goal hint' }, this.hintText) : null,
+      failed && !g.canAdvance().ok ? h('div', { class: 'why' }, h('ul', {}, g.check().why.map((w) => h('li', {}, w)))) : null,
       this.cardMin ? null : h('div', { class: 'acts' }, acts),
     );
   }
@@ -306,7 +409,7 @@ export class App {
     const g = this.game;
     const tabs = ['setup', 'phoro', 'ret', 'chart', 'sheet', 'log', 'help'];
     this.tabsEl.replaceChildren(
-      ...tabs.map((t) => h('button', { type: 'button', role: 'tab', class: this.tab === t ? 'on' : '', 'aria-selected': this.tab === t ? 'true' : 'false', onclick: () => { this.showTab(t); } }, TAB_LABEL[t])),
+      ...tabs.map((t) => h('button', { type: 'button', role: 'tab', class: `t-${t}${this.tab === t ? ' on' : ''}`, 'aria-selected': this.tab === t ? 'true' : 'false', onclick: () => { this.showTab(t); } }, TAB_LABEL[t])),
       h('span', { class: 'grow' }),
       h('button', { type: 'button', class: 'fold', 'aria-label': '收合/展開操作台', onclick: () => this.cycleDeck() }, '⇕'),
     );
@@ -354,12 +457,18 @@ export class App {
       case 'chart': this.showTab('chart'); break;
       case 'sheet': this.showTab('sheet'); break;
       case 'ret': this.showTab('ret'); break;
-      case 'sanitize': g.sanitize(); this.toast('已消毒'); this.showTab('setup', false); break;
-      case 'switch': g.setDim(!g.room.dim); this.showTab('setup', false); break;
-      case 'table': this.showTab('setup', false); break;
-      case 'pd': g.measurePD(); this.showTab('setup', false); break;
+      case 'sanitize': g.sanitize(); this.toast('已消毒'); this.focusSetup('sanitize'); break;
+      case 'switch': g.setDim(!g.room.dim); this.toast(g.room.dim ? '燈光已調暗' : '燈光已打開'); this.focusSetup('dim'); break;
+      case 'table': this.focusSetup('height'); break;
+      case 'pd': g.measurePD(); this.toast(`PD ${g.measuredPD} mm,接著把驗光儀的 PD 調成一樣`); this.focusSetup('pd'); break;
       default: break;
     }
+  }
+
+  focusSetup(id) {
+    if (this.tab !== 'setup') this.showTab('setup', false);
+    if (this.appEl.dataset.deck === 's') { this.deckPref = 'm'; this.appEl.dataset.deck = 'm'; this.appEl.classList.remove('collapsed'); }
+    requestAnimationFrame(() => this.panels.setup.focus?.(id));
   }
 
   /* ---------------- 與受測者對話 ---------------- */

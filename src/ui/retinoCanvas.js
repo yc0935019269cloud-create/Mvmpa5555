@@ -24,6 +24,10 @@ export class RetinoView {
     this.running = false;
     this.frameCbs = new Set(); // 每一幀畫完後通知(驗光儀窺孔跟著重畫)
     this.iris = ['#6b4a2f', '#4f7a8a', '#5d6f3f', '#7a5a3a'][game.patient.seed % 4];
+    // 虹膜紋理(固定,每位受測者一樣)
+    this.striae = Array.from({ length: 64 }, (_, i) => ({ a: (i / 64) * Math.PI * 2 + Math.sin(i * 12.9898 + game.patient.seed) * 0.05, l: 0.55 + ((Math.sin(i * 78.233 + game.patient.seed) * 43758.5453) % 1 + 1) % 1 * 0.45, d: i % 3 === 0 }));
+    this.blink = 0;
+    this.blinkAt = performance.now() + 2500 + Math.random() * 3000;
     if (canvas) this.bindPointer();
   }
 
@@ -65,6 +69,11 @@ export class RetinoView {
   // 一幀:更新掃動位置 → 畫大畫面 → 通知窺孔重畫
   draw() {
     const g = this.game;
+    // 偶爾眨眼(約 180 ms)
+    const now = performance.now();
+    if (now > this.blinkAt + 180) this.blinkAt = now + 3000 + Math.random() * 4000;
+    const bp = (now - this.blinkAt) / 180;
+    this.blink = bp > 0 && bp < 1 ? 1 - Math.abs(bp * 2 - 1) : 0;
     this.s = this.manualS !== null ? this.manualS : Math.sin(this.t * 2 * Math.PI * 0.5) * 1.05;
     this.info = reflex(g.trueRx(this.eye), g.lens(this.eye), g.wdD, this.angle);
     this.scene(this.ctx, this.eye, { overlay: true, streak: true });
@@ -93,21 +102,34 @@ export class RetinoView {
     const th = rad(this.angle);
     const ux = Math.cos(phi), uy = -Math.sin(phi);
     const Rb = 125;
-    const pupilR = 38;
+    // 室內燈光:調暗 → 瞳孔放大、反射光對比清楚;燈太亮 → 瞳孔縮小、反射光被洗淡(前置要調暗燈光的原因)
+    const dim = g.room.dim;
+    const pupilR = (dim ? 38 : 26) * (1 + Math.sin(performance.now() / 900) * 0.015);
+    const contrast = dim ? 1 : 0.55;
 
     ctx.fillStyle = '#080b0d'; ctx.fillRect(0, 0, W, H);
-    // 眼瞼 / 眼白
+    // 臉 / 眼白
     ctx.save();
     const grd = ctx.createRadialGradient(cx, cy, 20, cx, cy, 190);
-    grd.addColorStop(0, '#3a2a24'); grd.addColorStop(1, '#161110');
+    grd.addColorStop(0, dim ? '#3a2a24' : '#7a5f52'); grd.addColorStop(1, dim ? '#161110' : '#3b2d27');
     ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
     ctx.beginPath(); ctx.ellipse(cx, cy, 190, 92, 0, 0, Math.PI * 2);
-    ctx.fillStyle = '#4a403d'; ctx.fill();
-    // 虹膜與瞳孔
-    ctx.beginPath(); ctx.arc(cx, cy, 78, 0, Math.PI * 2); ctx.fillStyle = this.iris; ctx.globalAlpha = 0.55; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.fillStyle = dim ? '#4a403d' : '#a39890'; ctx.fill();
+    // 虹膜(放射狀紋理 + 角膜緣)與瞳孔
+    ctx.beginPath(); ctx.arc(cx, cy, 78, 0, Math.PI * 2); ctx.fillStyle = this.iris; ctx.globalAlpha = dim ? 0.55 : 0.85; ctx.fill();
+    ctx.lineWidth = 1.4;
+    for (const st of this.striae) {
+      ctx.strokeStyle = st.d ? 'rgba(0,0,0,.35)' : 'rgba(255,240,220,.16)';
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(st.a) * (pupilR + 3), cy + Math.sin(st.a) * (pupilR + 3));
+      ctx.lineTo(cx + Math.cos(st.a) * (pupilR + 3 + (75 - pupilR) * st.l), cy + Math.sin(st.a) * (pupilR + 3 + (75 - pupilR) * st.l));
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, 77, 0, Math.PI * 2); ctx.strokeStyle = 'rgba(10,8,6,.55)'; ctx.lineWidth = 5; ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, pupilR, 0, Math.PI * 2); ctx.fillStyle = '#050606'; ctx.fill();
     ctx.restore();
-    if (!streak) return;
+    if (!streak) { this.lids(ctx, dim); return; }
 
     // 光條(打在臉上)
     const px = cx + ux * s * Rb, py = cy + uy * s * Rb;
@@ -125,7 +147,7 @@ export class RetinoView {
     const dist = Math.abs(s * Rb);
     const visible = Math.max(0, Math.min(1, 1.9 - dist / pupilR)); // 光條靠近瞳孔時才出現
     if (visible > 0) {
-      const col = (a) => `rgba(255,${Math.round(90 + 70 * info.brightness)},${Math.round(40 + 30 * info.brightness)},${a})`;
+      const col = (a) => `rgba(255,${Math.round(90 + 70 * info.brightness)},${Math.round(40 + 30 * info.brightness)},${a * contrast})`;
       if (info.neutral) {
         ctx.fillStyle = col(0.95 * visible);
         ctx.fillRect(cx - pupilR, cy - pupilR, pupilR * 2, pupilR * 2);
@@ -141,6 +163,15 @@ export class RetinoView {
       }
     }
     ctx.restore();
+    // 角膜反光:光條在角膜上的小亮點,位置跟著光條稍微移動
+    if (dist < Rb * 0.9) {
+      ctx.save();
+      ctx.translate(cx + ux * s * 9 - 6, cy + uy * s * 9 - 8); ctx.rotate(-th);
+      ctx.fillStyle = `rgba(255,252,240,${0.85 * (1 - dist / (Rb * 0.9))})`;
+      ctx.beginPath(); ctx.ellipse(0, 0, 6, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    this.lids(ctx, dim);
     if (!overlay) return;
 
     // 方向提示(字放大,手機縮小後仍讀得到)
@@ -154,7 +185,8 @@ export class RetinoView {
     ctx.fillText(`${eye === 'OD' ? '右眼 OD' : '左眼 OS'} · ${g.wdCm} cm`, W - 14, 26);
     ctx.textAlign = 'left';
     if (this.hintOn) {
-      const txt = `${info.neutral ? '中和' : info.motion === 'with' ? '順動 → 加正' : '逆動 → 減正'}  (${info.r > 0 ? '+' : ''}${info.r.toFixed(2)}D)`;
+      // 殘餘度數只在上帝視角顯示,平常只提示動向,要自己判斷還差多少
+      const txt = `${info.neutral ? '中和' : info.motion === 'with' ? '順動 → 加正' : '逆動 → 減正'}${g.god ? `  (${info.r > 0 ? '+' : ''}${info.r.toFixed(2)}D)` : ''}`;
       ctx.font = '700 19px sans-serif';
       const tw = ctx.measureText(txt).width + 24;
       ctx.fillStyle = 'rgba(0,0,0,.55)';
@@ -162,6 +194,24 @@ export class RetinoView {
       ctx.fillStyle = info.neutral ? '#86e0a4' : info.motion === 'with' ? '#ffcf70' : '#8fd0ff';
       ctx.fillText(txt, 22, 32);
     }
+    ctx.restore();
+  }
+
+  // 眨眼:上眼瞼蓋下來(下眼瞼稍微往上)
+  lids(ctx, dim) {
+    const b = this.blink;
+    if (!b) return;
+    const cx = W / 2, cy = H / 2;
+    ctx.save();
+    ctx.beginPath(); ctx.ellipse(cx, cy, 192, 94, 0, 0, Math.PI * 2); ctx.clip();
+    // 眼瞼邊緣是弧形:兩端固定在眼角,中間往下(上眼瞼)/往上(下眼瞼)
+    const yUp = cy - 94 + 188 * b * 0.82, yLo = cy + 94 - 188 * b * 0.18;
+    const L = cx - 200, R = cx + 200;
+    ctx.fillStyle = dim ? '#33241f' : '#6f554a';
+    ctx.beginPath(); ctx.moveTo(L, 0); ctx.lineTo(L, cy); ctx.quadraticCurveTo(cx, 2 * yUp - cy, R, cy); ctx.lineTo(R, 0); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(L, H); ctx.lineTo(L, cy); ctx.quadraticCurveTo(cx, 2 * yLo - cy, R, cy); ctx.lineTo(R, H); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.65)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(L, cy); ctx.quadraticCurveTo(cx, 2 * yUp - cy, R, cy); ctx.stroke();
     ctx.restore();
   }
 }

@@ -12,6 +12,8 @@ import { makeRng } from '../sim/rng.js';
 export const EYES = ['OD', 'OS'];
 export const other = (e) => (e === 'OD' ? 'OS' : 'OD');
 export const EYE_LABEL = { OD: '右眼 OD', OS: '左眼 OS' };
+// 判斷「目前鏡片 = 紀錄單上那一筆」用的鍵(沒有散光時軸度不算)
+export const rxKey = ({ s, c, a }) => `${s}/${c}/${c ? a : 0}`;
 
 // 步驟表
 export const STEPS = [
@@ -117,6 +119,7 @@ export class Game {
 
   /* ---------- 鏡片 / 儀器 ---------- */
   lens(eye) { const { s, c, a } = this.phoro[eye]; return { s, c, a }; }
+  lensKey(eye) { return rxKey(this.phoro[eye]); }
   trueRx(eye) { return this.patient.eyes[eye].rx; }
   trueM(eye) { return toVec(this.trueRx(eye)).M; }
   dM(eye) { return toVec(this.lens(eye)).M - this.trueM(eye); }
@@ -275,7 +278,7 @@ export class Game {
     else if (correct === 0) txt = '這一排太小了,看不太到…';
     else txt = `${shown}…(有點不確定)`;
     this.say('patient', `「${txt}」`);
-    this.hist[this.activeEye].reads.push({ row, correct, total, isolated, ph: this.phoro[this.activeEye].aux === 'PH' });
+    this.hist[this.activeEye].reads.push({ row, correct, total, isolated, ph: this.phoro[this.activeEye].aux === 'PH', step: this.stepId, lens: this.lensKey(this.activeEye) });
     this.ev('read', { eye: this.activeEye, row, correct, total, isolated });
     this.emit();
     return { correct, total, row };
@@ -399,42 +402,47 @@ export class Game {
   recordWD(cm) { this.sheet.wdCm = cm; this.emit(); }
 
   /* ---------- 步驟控制 ---------- */
-  check() {
-    // 教學模式用:目前步驟的完成條件 → { ok, why[] }
+  // 目前步驟的過關條件(含已完成的),UI 用來顯示即時清單:[{ ok, label, why }]
+  conditions() {
     const id = this.stepId;
-    const why = [];
     const def = this.stepDef;
     const eye = def.eye;
     const S = this.sheet;
+    const out = [];
+    const c = (ok, label, why) => out.push({ ok: !!ok, label, why: why ?? `還沒完成:${label}` });
     if (id === 'setup') {
       const st = this.setupState();
-      for (const it of SETUP_ITEMS) if (!st[it.id]) why.push(`還沒完成:${it.label}`);
+      for (const it of SETUP_ITEMS) c(st[it.id], it.label);
     } else if (id === 'ret') {
-      for (const e of EYES) if (!this.retNeutral(e, 0.8)) why.push(`${EYE_LABEL[e]} 還沒中和(順動加正、逆動減正;兩個軸都要)`);
+      for (const e of EYES) c(this.retNeutral(e, 0.8), `${EYE_LABEL[e]} 兩個軸都中和`, `${EYE_LABEL[e]} 還沒中和(順動加正、逆動減正;兩個軸都要)`);
     } else if (id === 'wd') {
-      if (!this.wdApplied) why.push('還沒給工作距離度數');
-      for (const e of EYES) if (!S.slots.ret[e]) why.push(`${EYE_LABEL[e]} 的 Ret 度數還沒記錄`);
-      if (S.wdCm === null) why.push('紀錄單的「工作距離」還沒填');
+      c(this.wdApplied, '雙眼給工作距離度數', '還沒給工作距離度數');
+      for (const e of EYES) c(S.slots.ret[e], `記錄 ${e} 的 Ret 度數`, `${EYE_LABEL[e]} 的 Ret 度數還沒記錄`);
+      c(S.wdCm !== null, '紀錄單填工作距離', '紀錄單的「工作距離」還沒填');
     } else if (def.phase === 'va') {
-      const iso = this.hist[eye].reads.some((r) => r.isolated);
-      if (!iso) why.push('還沒有在「只測這隻眼、遮住另一隻眼」的情況下測視力');
-      if (!S.va.ret[eye]) why.push('還沒把 VA 記到紀錄單 ①');
+      c(this.hist[eye].reads.some((r) => r.isolated), `遮住另一眼、只用 ${eye} 讀視標`, '還沒有在「只測這隻眼、遮住另一隻眼」的情況下測視力');
+      c(S.va.ret[eye], '把 VA 記到紀錄單 ①', '還沒把 VA 記到紀錄單 ①');
     } else if (def.phase === 'mp1' || def.phase === 'mp2') {
       const slot = def.phase;
-      if (def.phase === 'mp1' && this.hist[eye].fogMax.mp1 < 0.5) why.push('還沒有霧視(讓 0.6 視標明顯模糊)');
-      if (!S.slots[slot][eye]) why.push('還沒記錄度數');
-      if (!S.va[slot][eye]) why.push('還沒記錄 VA');
-      const d = this.dM(eye);
-      if (S.slots[slot][eye] && Math.abs(S.slots[slot][eye].rx && toVec(S.slots[slot][eye].rx).M - this.trueM(eye)) > 0.8) why.push('球面度數離最佳還有一段距離,再慢慢調整(最大正度數 + 最佳視力)');
-      void d;
+      if (slot === 'mp1') c(this.hist[eye].fogMax.mp1 >= 0.5, '先霧視(0.6 明顯模糊)', '還沒有霧視(讓 0.6 視標明顯模糊)');
+      c(S.slots[slot][eye], '記錄度數', '還沒記錄度數');
+      c(S.va[slot][eye], '記錄 VA', '還沒記錄 VA');
+      const rec = S.slots[slot][eye];
+      if (rec) c(Math.abs(toVec(rec.rx).M - this.trueM(eye)) <= 0.8, '記錄的度數接近最佳', '球面度數離最佳還有一段距離,再慢慢調整(最大正度數 + 最佳視力)');
     } else if (def.phase === 'duo') {
       const d = this.hist[eye].duo;
-      if (!d.length) why.push('還沒做紅綠檢查');
-      else if (d[d.length - 1].ans === 'red') why.push('最後一次答案是「紅色較清楚」,度數偏正,要再加負 −0.25D');
+      c(d.length, '問過紅綠哪邊清楚', '還沒做紅綠檢查');
+      if (d.length) c(d[d.length - 1].ans !== 'red', '停在綠色第一片清楚(或一樣)', '最後一次答案是「紅色較清楚」,度數偏正,要再加負 −0.25D');
     } else if (def.phase === 'jcc') {
-      if (!this.path[eye]) why.push('先選「這隻眼要走哪條路」(APA / PPAP / 鐘面圖 / 不需要)');
-      if (!S.slots.jcc[eye]) why.push('JCC 結束後要記錄度數(③)');
+      c(this.path[eye], '選散光路線', '先選「這隻眼要走哪條路」(APA / PPAP / 鐘面圖 / 不需要)');
+      c(S.slots.jcc[eye], '記錄 JCC 後的度數 ③', 'JCC 結束後要記錄度數(③)');
     }
+    return out;
+  }
+
+  check() {
+    // 教學模式用:目前步驟的完成條件 → { ok, why[] }
+    const why = this.conditions().filter((x) => !x.ok).map((x) => x.why);
     return { ok: why.length === 0, why };
   }
 
