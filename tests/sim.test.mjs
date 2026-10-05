@@ -6,6 +6,8 @@ import {
 import {
   generatePatient, lensToVec, effectiveBlur, predictDecimal, compareLenses, duochrome, clockDial, readRow,
 } from '../src/sim/patient.js';
+import { Game } from '../src/game/state.js';
+import { faceSVG, AUX_POS } from '../src/render/phoropterSVG.js';
 import { reflex, residualAt, fullyNeutral, WD_OPTIONS, wdDiopter } from '../src/sim/retino.js';
 
 let passed = 0;
@@ -155,6 +157,26 @@ t('各工作距離:中和鏡片 = 真實處方 + 1/WD,且選項度數與距離�
     assert.ok(fullyNeutral(trueRx, lens, o.d), `${o.cm} cm`);
     assert.ok(!fullyNeutral(trueRx, { ...lens, s: lens.s + 0.75 }, o.d));
   }
+});
+
+console.log('phoropter face');
+t('驗光儀面板:各種狀態都能產生 SVG,且反映鏡片與輔助鏡', () => {
+  const g = new Game({ mode: 'free', seed: 3 });
+  for (const aux of AUX_POS) {
+    g.setAux('OD', aux); g.setLens('OD', { s: -2.75, c: -1.25, a: 35 }); g.setLens('OS', { s: 1.5, c: -0.5, a: 170 });
+    g.setOcc('OS', true); g.setJccMode('A');
+    const svg = faceSVG(g);
+    assert.ok(svg.startsWith('<svg') && svg.endsWith('</svg>'));
+    assert.ok(svg.includes('−2.75') && svg.includes('+1.50'), aux);
+    assert.ok(svg.includes('遮蓋中'));
+  }
+});
+t('輔助鏡:稜鏡擋住比較;+.12 讓球面多 0.12D', () => {
+  const g = new Game({ mode: 'free', seed: 3 });
+  g.setTestEye('OD'); g.setAux('OD', '6ΔU');
+  assert.equal(g.askCompare(-0.25), null);
+  g.setAux('OD', '+.12');
+  near(g.lensVec('OD').M - toVec(g.lens('OD')).M, 0.12);
 });
 
 console.log(`\n${passed} passed`);

@@ -248,3 +248,17 @@ details.items summary { cursor: pointer; font-weight: 700; color: var(--acc); pa
 .menu-pop button:hover { background: var(--accs); }
 .menu-pop hr { border: 0; border-top: 1px solid var(--line); width: 100%; margin: 2px 0; }
 .hidden { display: none !important; }
+
+/* ---------- 擬真綜合驗光儀 ---------- */
+.pface { width: 100%; line-height: 0; border-radius: 16px; background: linear-gradient(#1b2328, #12181c); padding: 6px; user-select: none; -webkit-user-select: none; }
+.pface svg { width: 100%; height: auto; display: block; }
+.pface .pf-knob, .pface [data-k] { touch-action: none; }
+.pface .pf-knob:hover circle:first-child { filter: brightness(1.08); }
+.pface.zoom { max-width: min(96vw, 1180px); }
+.pzoom { align-items: flex-start; }
+.pzoom-in { width: min(96vw, 1180px); margin: auto; background: #0f1a1f; border-radius: 16px; padding: 10px; }
+.pzoom-bar { display: flex; gap: 12px; align-items: center; color: #eaf3f6; padding: 4px 6px 10px; flex-wrap: wrap; }
+.pzoom-bar .note { color: #a8bcc4; flex: 1; }
+details.fold { border-top: 1px dashed var(--line); padding-top: 6px; }
+details.fold summary { cursor: pointer; color: var(--acc); font-size: 13px; padding: 6px 0; }
+.facewrap { display: flex; flex-direction: column; gap: 6px; }

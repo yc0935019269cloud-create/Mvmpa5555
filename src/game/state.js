@@ -40,6 +40,7 @@ export const SETUP_ITEMS = [
   { id: 'dim', label: '室內燈光微暗', weight: 1 },
 ];
 
+const PRISM_AUX = ['6ΔU', '10ΔI'];
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
 export class Game {
@@ -55,6 +56,7 @@ export class Game {
     this.god = mode === 'free';
     this.wdCm = 67;
     this.wdApplied = false;
+    this.nearPD = false;
     this.autoComp = mode === 'tutorial';
     this.compAcc = { OD: 0, OS: 0 };
 
@@ -122,6 +124,7 @@ export class Game {
 
   lensVec(eye) {
     let v = toVec(this.lens(eye));
+    if (this.phoro[eye].aux === '+.12') v = { ...v, M: v.M + 0.12 }; // 輔助鏡 +0.12D
     if (this.jccActiveFor(eye)) {
       const { mode, pos } = this.phoro.jcc;
       v = addVec(v, jccVec(jccRedAxis(mode, pos, this.phoro[eye].a)));
@@ -237,6 +240,12 @@ export class Game {
   recordPD(v) { this.sheet.pd = v; this.emit(); }
 
   /* ---------- 與受測者互動 ---------- */
+  // 輔助鏡轉到稜鏡 → 受測者看到重影,無法比較或讀視標
+  prismBlock(eyes) {
+    const hit = eyes.find((e) => PRISM_AUX.includes(this.phoro[e].aux));
+    if (hit) { this.say('patient', '「咦?看到兩個重疊的影像…是不是有放稜鏡?」'); return true; }
+    return false;
+  }
   openEyes() { return ['OD', 'OS'].filter((e) => !this.phoro.occ[e]); }
 
   // 最佳睜開眼的 logMAR(含針孔、JCC)
@@ -254,6 +263,7 @@ export class Game {
     const open = this.openEyes();
     if (!open.length) { this.say('patient', '咦?我什麼都看不到,兩邊都被擋住了。'); return null; }
     if (this.chart.mode !== 'digits' && this.chart.mode !== 'rg') { this.say('patient', '這個圖案不是數字耶,我沒辦法讀。'); return null; }
+    if (this.prismBlock(open)) return null;
     const lm = this.seenLogMAR(open);
     const row = this.chart.row;
     const { correct, total } = readRow(this.patient, lm, row);
@@ -281,6 +291,7 @@ export class Game {
   askCompare(dir) {
     const eye = this.activeEye;
     if (this.phoro.occ[eye]) { this.say('patient', '這隻眼睛被遮住了,我看不到。'); return null; }
+    if (this.prismBlock([eye])) return null;
     const pinhole = this.phoro[eye].aux === 'PH';
     const l1 = toVec(this.lens(eye));
     const l2 = toVec({ ...this.lens(eye), s: this.lens(eye).s + dir });
@@ -297,6 +308,7 @@ export class Game {
     const eye = this.activeEye;
     const usingRG = this.phoro[eye].aux === 'RG' || this.chart.mode === 'rg';
     if (this.phoro.occ[eye]) { this.say('patient', '這隻眼睛被遮住了,我看不到。'); return null; }
+    if (this.prismBlock([eye])) return null;
     if (!usingRG) { this.say('patient', '我看到的就是黑白數字,沒有紅綠耶。'); return null; }
     const ans = duochrome(this.patient, eye, this.lensVec(eye));
     this.say('you', '請比較綠色邊與紅色邊,哪一邊的字比較清晰?');
@@ -313,6 +325,7 @@ export class Game {
     const { mode } = this.phoro.jcc;
     if (mode === 'off') { this.say('patient', '(還沒有放上 JCC)'); return null; }
     if (this.phoro.occ[eye]) { this.say('patient', '這隻眼睛被遮住了,我看不到。'); return null; }
+    if (this.prismBlock([eye])) return null;
     if (this.chart.mode !== 'digits' && this.chart.mode !== 'honey') { this.say('patient', '這個圖案不適合比較 JCC,請換成蜂巢或數字視標。'); return null; }
     const a = this.phoro[eye].a;
     const base = toVec(this.lens(eye));
@@ -335,6 +348,7 @@ export class Game {
   askClock() {
     const eye = this.activeEye;
     if (this.phoro.occ[eye]) { this.say('patient', '這隻眼睛被遮住了,我看不到。'); return null; }
+    if (this.prismBlock([eye])) return null;
     if (this.chart.mode !== 'clock') { this.say('patient', '(視標還不是散光鐘面圖)'); return null; }
     const r = clockDial(this.patient, eye, this.lensVec(eye));
     this.say('you', '請問哪一條線比較黑、比較清楚?');

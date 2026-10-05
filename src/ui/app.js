@@ -5,6 +5,7 @@ import { score, summarizeEyes } from '../game/scoring.js';
 import { drawChart, CHART_W, CHART_H } from '../render/chartCanvas.js';
 import { ClinicScene } from '../render/scene.js';
 import { fmtRx } from '../sim/optics.js';
+import { faces } from './phoropterFace.js';
 import {
   buildSetup, buildPhoro, buildRet, buildChartPanel, buildSheet, buildLog, buildHelp,
 } from './panels.js';
@@ -157,6 +158,7 @@ export class App {
     const g = this.game;
     this.scene?.refresh();
     if (kind === 'slider') return;
+    if (window.__pfDrag) { for (const f of faces) f.update(); return; } // 旋鈕拖曳中:只更新驗光儀,放開後再整體刷新
     this.repaintChart();
     if (kind === 'log') {
       const m = g.log[g.log.length - 1];

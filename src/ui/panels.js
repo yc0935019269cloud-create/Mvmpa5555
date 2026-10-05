@@ -6,6 +6,7 @@ import {
 import { VA_ROWS, fmtRx, fmtSph, jccRedAxis, snellen, mod180 } from '../sim/optics.js';
 import { WD_OPTIONS } from '../sim/retino.js';
 import { RetinoView } from './retinoCanvas.js';
+import { PhoropterFace, openZoom } from './phoropterFace.js';
 import { drawChart, drawBlurred, CHART_W, CHART_H } from '../render/chartCanvas.js';
 import { effectiveBlur, eyeResidual } from '../sim/patient.js';
 import { toVec } from '../sim/optics.js';
@@ -187,6 +188,26 @@ function recordBar(game) {
 
 let ctxToast = () => {};
 
+// 「精確按鈕調整」收合區:記住展開狀態,不會因為每次重繪就收起來
+function foldBox(ctx, content) {
+  const d = h('details', { class: 'fold', open: ctx.foldOpen ? true : undefined }, h('summary', {}, '精確按鈕調整(備用)'), content);
+  d.addEventListener('toggle', () => { ctx.foldOpen = d.open; });
+  return d;
+}
+
+// 擬真驗光儀:每個分頁一個實體,重繪時重複使用(避免拖曳中被重建)
+function faceBlock(game, ctx) {
+  const key = '_face';
+  const wrap = h('div', { class: 'facewrap' });
+  const face = (ctx[key] ??= new PhoropterFace(game));
+  face.update();
+  wrap.append(face.el,
+    h('div', { class: 'row wrap' }, h('button', { class: 'b sm', type: 'button', onclick: () => openZoom(game) }, '⤢ 放大'),
+      h('span', { class: 'note' }, '拖曳旋鈕轉動;點旋鈕左半(−)/右半(+);滾輪也可')),
+    h('p', { class: 'note' }, `測試眼:${game.activeEye === 'OD' ? '右眼 OD' : '左眼 OS'}(點窗口 = 遮蓋 / 打開窺孔蓋;JCC 旋鈕點一下切換 關 → A → P)`));
+  return wrap;
+}
+
 export function buildPhoro(game, ctx) {
   ctxToast = ctx.toast;
   const root = h('div', { class: 'panel' });
@@ -207,7 +228,8 @@ export function buildPhoro(game, ctx) {
           btn('只測左眼(關右眼)', () => game.setTestEye('OS'), { cls: P.occ.OS === false && P.occ.OD ? 'on' : '' }),
           btn('雙眼睜開', () => game.openBoth(), { cls: !P.occ.OD && !P.occ.OS ? 'on' : '' })),
         h('p', { class: 'note' }, `目前:右眼${P.occ.OD ? '遮住' : '睜開'} · 左眼${P.occ.OS ? '遮住' : '睜開'}`)),
-      section('② 綜合驗光儀', lensControls(game, eye),
+      section('② 綜合驗光儀(轉旋鈕)', faceBlock(game, ctx),
+        foldBox(ctx, lensControls(game, eye)),
         h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked: game.autoComp, onchange: (e) => game.setAutoComp(e.target.checked) }),
           h('span', {}, '改散光時自動補償球面(每 −0.50DC 補 +0.25DS)'))),
       section('③ 視標(遠方 6 m)',
@@ -285,7 +307,8 @@ export function buildRet(game, ctx) {
         btn(view.auto ? '⏸ 暫停自動掃動' : '▶ 自動掃動', () => { view.auto = !view.auto; render(); }),
         h('label', { class: 'toggle inline' }, h('input', { type: 'checkbox', checked: view.slow, onchange: (e) => { view.slow = e.target.checked; } }), h('span', {}, '慢動作')),
         h('span', { class: 'note' }, '也可以直接用手指/滑鼠在畫面上拖曳光帶')),
-      section('綜合驗光儀鏡片(中和用)', lensControls(game, eye, { showAux: false, showJcc: false })),
+      section('綜合驗光儀(中和用)', faceBlock(game, ctx),
+        foldBox(ctx, lensControls(game, eye, { showAux: false, showJcc: false }))),
       section('工作距離與結束檢影',
         h('div', { class: 'row wrap' }, h('span', { class: 'lab' }, '工作距離'),
           segmented(WD_OPTIONS.map((o) => [o.cm, `${o.cm} cm${o.note ? '·' + o.note : ''}`]), game.wdCm, (cm) => game.setWD(cm))),

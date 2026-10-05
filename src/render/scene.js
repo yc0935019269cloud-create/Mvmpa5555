@@ -1,6 +1,7 @@
 // 3D 診間:長條形診間(受測者 → 綜合驗光儀 → 驗光師 → 6 m → 視力表),投影機在左上角
 import * as THREE from '../../vendor/three.module.min.js';
 import { fmtSph } from '../sim/optics.js';
+import { faceSVG, VB_W, VB_H } from './phoropterSVG.js';
 
 const M = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: o.rough ?? 0.8, metalness: o.metal ?? 0, emissive: o.emissive ?? 0x000000, emissiveIntensity: o.ei ?? 1, transparent: o.opacity !== undefined, opacity: o.opacity ?? 1 });
 const box = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -248,80 +249,48 @@ export class ClinicScene {
   buildPhoropter() {
     const S = this.scene;
     const P = (this.phoro = new THREE.Group());
-    const dark = M(0x2c333a, { rough: 0.45, metal: 0.2 });
-    const lid = M(0x3d4750, { rough: 0.4, metal: 0.3 });
-    const body = box(0.3, 0.13, 0.12, dark); P.add(body);
-    const top = box(0.31, 0.02, 0.13, lid); top.position.y = 0.075; P.add(top);
-    // 前面板(驗光師看到的那一面)
-    const face = box(0.29, 0.12, 0.012, M(0x20262b, { rough: 0.5 })); face.position.z = -0.066; P.add(face);
-    // 額靠 + 下巴靠(朝受測者)
-    const rest = box(0.1, 0.035, 0.05, M(0x8da0a8)); rest.position.set(0, 0.06, 0.1); P.add(rest);
-    const rod = cyl(0.008, 0.008, 0.1, M(0x8a979c)); rod.rotation.x = Math.PI / 2; rod.position.set(0, 0.06, 0.07); P.add(rod);
-    // 支撐臂
-    this.arm = box(0.05, 0.3, 0.05, M(0x6a777d, { metal: 0.4 })); this.arm.position.set(0, -0.2, 0.0); P.add(this.arm);
-    // 水平泡
-    this.bubble = new THREE.Group();
-    const tube = box(0.09, 0.012, 0.012, M(0xcdeef0, { opacity: 0.8 }));
-    this.bubbleDot = sph(0.007, M(0x4aa3b8)); this.bubble.add(tube, this.bubbleDot);
-    this.bubble.position.set(0, 0.092, -0.03); P.add(this.bubble);
-    // 鎖定燈
-    this.lockLed = sph(0.008, M(0xcc3333, { emissive: 0xcc3333 })); this.lockLed.position.set(0.13, 0.05, -0.073); P.add(this.lockLed);
-    // 窺孔蓋(窺孔未開時蓋住)
-    this.apCover = box(0.27, 0.05, 0.008, M(0x5d6870)); this.apCover.position.set(0, 0.0, -0.077); P.add(this.apCover);
-
-    this.cells = {};
-    for (const eye of ['OD', 'OS']) {
-      const cell = new THREE.Group();
-      const sgn = eye === 'OD' ? 1 : -1;
-      const housing = cyl(0.036, 0.036, 0.03, M(0x30383f, { metal: 0.3, rough: 0.4 })); housing.rotation.x = Math.PI / 2; housing.position.z = -0.07;
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.004, 12, 32), M(0xd4dbde, { metal: 0.8, rough: 0.25 })); ring.position.z = -0.087;
-      const glass = new THREE.Mesh(new THREE.CircleGeometry(0.022, 32), new THREE.MeshStandardMaterial({ color: 0x9fd2e6, transparent: true, opacity: 0.3, roughness: 0.1, metalness: 0.2 }));
-      glass.position.z = -0.0875;
-      const occ = new THREE.Mesh(new THREE.CircleGeometry(0.027, 32), new THREE.MeshBasicMaterial({ color: 0x050607 })); occ.position.z = -0.0895; occ.visible = false;
-      const ph = new THREE.Group();
-      const phd = new THREE.Mesh(new THREE.CircleGeometry(0.026, 32), new THREE.MeshBasicMaterial({ color: 0x0a0b0c }));
-      const hole = new THREE.Mesh(new THREE.CircleGeometry(0.0035, 12), new THREE.MeshBasicMaterial({ color: 0xcdeef0 })); hole.position.z = 0.0005;
-      ph.add(phd, hole); ph.position.z = -0.0905; ph.visible = false;
-      const rg = new THREE.Group();
-      const rr = new THREE.Mesh(new THREE.CircleGeometry(0.026, 32, Math.PI / 2, Math.PI), new THREE.MeshBasicMaterial({ color: 0xcc2b2b, transparent: true, opacity: 0.6 }));
-      const gg = new THREE.Mesh(new THREE.CircleGeometry(0.026, 32, -Math.PI / 2, Math.PI), new THREE.MeshBasicMaterial({ color: 0x1fa25a, transparent: true, opacity: 0.6 }));
-      rg.add(rr, gg); rg.position.z = -0.091; rg.visible = false;
-      const cv = document.createElement('canvas'); cv.width = 160; cv.height = 64;
-      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-      const win = new THREE.Mesh(new THREE.PlaneGeometry(0.075, 0.03), new THREE.MeshBasicMaterial({ map: tex }));
-      win.position.set(0, -0.052, -0.0725);
-      const kn1 = cyl(0.011, 0.011, 0.018, M(0xd4463b)); kn1.rotation.x = Math.PI / 2; kn1.position.set(-0.026 * sgn, 0.052, -0.078);
-      const kn2 = cyl(0.014, 0.014, 0.018, M(0xf3f3f0)); kn2.rotation.x = Math.PI / 2; kn2.position.set(0.026 * sgn, 0.05, -0.078);
-      cell.add(housing, ring, glass, occ, ph, rg, win, kn1, kn2);
-      P.add(cell);
-      this.cells[eye] = { cell, occ, ph, rg, win, cv, tex, glass };
+    const FW = 0.36, FH = FW * (VB_H / VB_W); // 正面板尺寸(約 36 × 24 cm)
+    const ivory = new THREE.MeshPhongMaterial({ color: 0xd6d0c1, specular: 0x555555, shininess: 40 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(FW - 0.01, FH - 0.012, 0.11), ivory); P.add(body);
+    // 上方橫樑與背面圓殼,讓側面看起來有厚度
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(FW * 0.66, 0.045, 0.125), ivory); beam.position.set(0, FH / 2 - 0.02, 0.0); P.add(beam);
+    for (const k of [-1, 1]) {
+      const back = cyl(0.085, 0.085, 0.07, ivory, 40); back.rotation.x = Math.PI / 2; back.position.set(k * 0.1, -0.01, 0.075); P.add(back);
     }
-    // JCC 拉桿
-    const jcc = new THREE.Group();
-    const stem = cyl(0.004, 0.004, 0.06, M(0xd9dee1)); stem.rotation.z = Math.PI / 2; stem.position.x = 0.03;
-    const disc = new THREE.Mesh(new THREE.CircleGeometry(0.016, 20), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-    const rdot = sph(0.005, M(0xd02828, { emissive: 0xd02828 })); rdot.position.set(0.0, 0.01, 0.001);
-    jcc.add(stem, disc, rdot);
-    jcc.position.set(0.17, 0.0, -0.075); this.jccLever = jcc; jcc.visible = false; P.add(jcc);
-
+    // 貼圖正面(驗光師看到的那一面)
+    this.faceCanvas = document.createElement('canvas');
+    this.faceCanvas.width = VB_W; this.faceCanvas.height = VB_H;
+    this.faceTex = new THREE.CanvasTexture(this.faceCanvas);
+    this.faceTex.colorSpace = THREE.SRGBColorSpace;
+    this.faceTex.anisotropy = 8;
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(FW, FH), new THREE.MeshBasicMaterial({ map: this.faceTex, transparent: true }));
+    face.rotation.y = Math.PI; face.position.z = -0.0565; P.add(face);
+    this.faceMesh = face;
+    // 額靠(朝受測者)
+    const rest = box(0.1, 0.035, 0.05, M(0x8da0a8)); rest.position.set(0, 0.04, 0.12); P.add(rest);
+    const rod = cyl(0.008, 0.008, 0.1, M(0x8a979c)); rod.rotation.x = Math.PI / 2; rod.position.set(0, 0.04, 0.085); P.add(rod);
+    // 支撐臂
+    this.arm = box(0.05, 0.18, 0.05, M(0x6a777d, { metal: 0.4 })); this.arm.position.set(0, -0.2, 0.0); P.add(this.arm);
     P.position.set(0, 1.18, -0.14);
     S.add(P);
+    this._faceTok = 0;
+    this._faceSvg = '';
   }
 
-  drawCellWindows() {
-    const g = this.game;
-    for (const eye of ['OD', 'OS']) {
-      const { cv, tex } = this.cells[eye];
-      const x = cv.getContext('2d');
-      x.fillStyle = '#0b1318'; x.fillRect(0, 0, 160, 64);
-      x.fillStyle = '#7cf2c8'; x.font = '700 22px "IBM Plex Mono",monospace'; x.textAlign = 'center';
-      const l = g.phoro[eye];
-      x.fillText(fmtSph(l.s), 80, 24);
-      x.font = '600 15px monospace'; x.fillStyle = '#c8e7f2';
-      x.fillText(l.c ? `${fmtSph(l.c)} × ${l.a}` : '—', 80, 50);
-      x.font = '600 11px sans-serif'; x.fillStyle = '#ffd37a'; x.textAlign = 'left'; x.fillText(eye, 4, 12);
-      tex.needsUpdate = true;
-    }
+  updateFaceTexture() {
+    const svg = faceSVG(this.game, { interactive: false });
+    if (svg === this._faceSvg) return;
+    this._faceSvg = svg;
+    const tok = ++this._faceTok;
+    const img = new Image();
+    img.onload = () => {
+      if (tok !== this._faceTok) return;
+      const c = this.faceCanvas.getContext('2d');
+      c.clearRect(0, 0, VB_W, VB_H);
+      c.drawImage(img, 0, 0, VB_W, VB_H);
+      this.faceTex.needsUpdate = true;
+    };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   }
 
   /* ---------------- 受測者 ---------------- */
@@ -420,25 +389,8 @@ export class ClinicScene {
     this.table.children[0].position.y = ty; // tableTop
     this.tableCol.scale.y = ty; this.tableCol.position.y = ty / 2;
     this.phoro.position.y = ty + 0.3;
-    this.arm.scale.y = 1; this.arm.position.y = -0.2;
     // 水平
     this.phoro.rotation.z = (P.level * Math.PI) / 180;
-    this.bubbleDot.position.x = Math.max(-0.04, Math.min(0.04, P.level * 0.012));
-    // PD
-    const half = P.pd / 2000;
-    this.cells.OD.cell.position.x = half; this.cells.OS.cell.position.x = -half;
-    // 窺孔、鎖、遮蓋
-    this.apCover.visible = !P.aperture;
-    this.lockLed.material.color.set(P.locked ? 0x28c06a : 0xcc3333);
-    this.lockLed.material.emissive.set(P.locked ? 0x28c06a : 0xcc3333);
-    for (const eye of ['OD', 'OS']) {
-      const c = this.cells[eye];
-      c.occ.visible = P.occ[eye];
-      c.ph.visible = P[eye].aux === 'PH';
-      c.rg.visible = P[eye].aux === 'RG';
-    }
-    this.jccLever.visible = P.jcc.mode !== 'off';
-    this.jccLever.position.x = g.activeEye === 'OS' ? -0.2 : 0.2;
     // 燈光
     const dim = g.room.dim;
     this.hemi.intensity = dim ? 0.28 : 1.05;
@@ -449,7 +401,8 @@ export class ClinicScene {
     this.beam.material.opacity = dim ? 0.05 : 0.0;
     this.chartGlow.material.opacity = dim ? 0.07 : 0.0;
     this.renderer.toneMappingExposure = dim ? 1.05 : 1.0;
-    this.drawCellWindows();
+    this.faceMesh.material.color.setScalar(dim ? 0.72 : 1);
+    this.updateFaceTexture();
     this.drawSheet();
     this.chartTex.needsUpdate = true;
     this.updateHotspots();
