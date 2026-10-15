@@ -22,11 +22,19 @@ namespace RefractionRoom {
   Button next,resume;Text volumeLabel;Slider musicSlider;GameObject abandonConfirm;
   List<Button> prepButtons=new List<Button>();
   List<GameObject> retControls=new List<GameObject>();
-  Color pale=new Color(.93f,.94f,.88f),muted=new Color(.64f,.72f,.68f),accent=new Color(.73f,.59f,.33f),dark=new Color(.055f,.105f,.10f,.94f),lighter=new Color(.12f,.21f,.20f,.96f);
+  Color pale=new Color(.95f,.96f,.92f),muted=new Color(.66f,.75f,.72f),accent=new Color(.88f,.71f,.40f),dark=new Color(.045f,.085f,.09f,.88f),lighter=new Color(.15f,.25f,.26f,.97f);
+  static readonly string[] Striped={"Objective card","Reason card","Preparation","Chart view","Retinoscope view","PD measurement","Pause card","Welcome card"};
+  static Sprite roundSprite;
+  static Sprite Round(){if(roundSprite)return roundSprite;int n=64;var t=new Texture2D(n,n,TextureFormat.RGBA32,false);t.wrapMode=TextureWrapMode.Clamp;var px=new Color32[n*n];for(int y=0;y<n;y++)for(int x=0;x<n;x++){float dx=Mathf.Max(0,Mathf.Abs(x+.5f-32)-1),dy=Mathf.Max(0,Mathf.Abs(y+.5f-32)-1);float d=Mathf.Sqrt(dx*dx+dy*dy);byte a=(byte)(Mathf.Clamp01(30.5f-d)*255);px[y*n+x]=new Color32(255,255,255,a);}t.SetPixels32(px);t.Apply();roundSprite=Sprite.Create(t,new Rect(0,0,n,n),new Vector2(.5f,.5f),100,0,SpriteMeshType.FullRect,new Vector4(31,31,31,31));return roundSprite;}
   RectTransform Rect(GameObject g,Transform parent,float x,float y,float w,float h,Vector2 anchor){g.transform.SetParent(parent,false);var rt=g.GetComponent<RectTransform>();if(!rt)rt=g.AddComponent<RectTransform>();rt.anchorMin=rt.anchorMax=anchor;rt.pivot=new Vector2(.5f,.5f);rt.anchoredPosition=new Vector2(x,y);rt.sizeDelta=new Vector2(w,h);return rt;}
-  GameObject Panel(string name,Transform parent,float x,float y,float w,float h,Vector2 anchor,Color color){var g=new GameObject(name,typeof(RectTransform),typeof(Image));Rect(g,parent,x,y,w,h,anchor);g.GetComponent<Image>().color=color;return g;}
+  GameObject Panel(string name,Transform parent,float x,float y,float w,float h,Vector2 anchor,Color color){var g=new GameObject(name,typeof(RectTransform),typeof(Image));Rect(g,parent,x,y,w,h,anchor);var img=g.GetComponent<Image>();img.color=color;
+   bool fullScreen=w>=1600||h>=900;
+   if(!fullScreen&&color.a>.01f){float r=Mathf.Min(w>=300&&h>=150?16:10,Mathf.Min(w,h)*.5f);img.sprite=Round();img.type=Image.Type.Sliced;img.pixelsPerUnitMultiplier=31f/Mathf.Max(1,r);
+    if(color.a>.6f&&w>=60&&h>=34){var sh=g.AddComponent<Shadow>();sh.effectColor=new Color(0,0,0,w>=300?.45f:.3f);sh.effectDistance=new Vector2(0,w>=300?-6:-3);}
+    if(System.Array.IndexOf(Striped,name)>=0){var st=new GameObject(name+" accent",typeof(RectTransform),typeof(Image));Rect(st,g.transform,0,h*.5f-3,w-36,3,new Vector2(.5f,.5f));st.GetComponent<Image>().color=new Color(accent.r,accent.g,accent.b,.85f);st.GetComponent<Image>().raycastTarget=false;}}
+   return g;}
   Text Txt(string name,Transform parent,string text,float x,float y,float w,float h,int size,Color color,Vector2 anchor,TextAnchor align=TextAnchor.MiddleLeft){var g=new GameObject(name,typeof(RectTransform),typeof(Text));Rect(g,parent,x,y,w,h,anchor);var t=g.GetComponent<Text>();t.font=font;t.fontSize=size;t.text=text;t.color=color;t.alignment=align;t.horizontalOverflow=HorizontalWrapMode.Wrap;t.verticalOverflow=VerticalWrapMode.Truncate;t.supportRichText=true;t.raycastTarget=false;return t;}
-  Button Btn(string name,Transform parent,string text,float x,float y,float w,float h,UnityAction callback,bool main=false){var g=Panel(name,parent,x,y,w,h,new Vector2(.5f,.5f),main?accent:lighter);var b=g.AddComponent<Button>();ColorBlock cb=b.colors;cb.normalColor=Color.white;cb.highlightedColor=new Color(1.18f,1.18f,1.1f);cb.pressedColor=new Color(.7f,.8f,.73f);cb.disabledColor=new Color(.38f,.45f,.4f);b.colors=cb;b.onClick.AddListener(callback);Txt(name+" label",g.transform,text,0,0,w-12,h,18,main?dark:pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);return b;}
+  Button Btn(string name,Transform parent,string text,float x,float y,float w,float h,UnityAction callback,bool main=false){var g=Panel(name,parent,x,y,w,h,new Vector2(.5f,.5f),main?accent:lighter);var b=g.AddComponent<Button>();ColorBlock cb=b.colors;cb.normalColor=Color.white;cb.highlightedColor=new Color(1.22f,1.2f,1.12f);cb.pressedColor=new Color(.75f,.82f,.78f);cb.fadeDuration=.08f;cb.disabledColor=new Color(.38f,.45f,.4f);b.colors=cb;b.onClick.AddListener(callback);Txt(name+" label",g.transform,text,0,0,w-12,h,18,main?dark:pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);return b;}
   public void Build(Font f,Texture scope){
    font=f;var canvas=new GameObject("Clinic UI",typeof(Canvas),typeof(CanvasScaler),typeof(GraphicRaycaster));canvas.GetComponent<Canvas>().renderMode=RenderMode.ScreenSpaceOverlay;scaler=canvas.GetComponent<CanvasScaler>();scaler.uiScaleMode=CanvasScaler.ScaleMode.ScaleWithScreenSize;scaler.referenceResolution=new Vector2(1600,900);scaler.matchWidthOrHeight=.5f;root=canvas.transform;
    if(!FindFirstObjectByType<EventSystem>()){new GameObject("EventSystem",typeof(EventSystem),typeof(StandaloneInputModule));}
@@ -185,7 +193,7 @@ namespace RefractionRoom {
    Btn("save and menu",pcard.transform,"保存進度，回主選單",0,-59,530,52,()=>world.ReturnToMenu(false));
    Btn("abandon",pcard.transform,"放棄這輪",0,-124,530,48,()=>abandonConfirm.SetActive(true));
    Txt("pause help",pcard.transform,"音量 0% 為靜音，設定會自動記住。\n回主選單後可選「繼續上次練習」。",0,-217,530,72,18,muted,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
-   abandonConfirm=Panel("Confirm abandon",pcard.transform,0,0,600,350,new Vector2(.5f,.5f),dark);
+   abandonConfirm=Panel("Confirm abandon",pcard.transform,0,0,620,590,new Vector2(.5f,.5f),new Color(.035f,.07f,.075f,1));
    Txt("abandon question",abandonConfirm.transform,"確定放棄這輪？\n這輪的病例進度與紀錄將清除。",0,65,540,100,24,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
    Btn("cancel abandon",abandonConfirm.transform,"保留這輪",-140,-80,260,54,()=>abandonConfirm.SetActive(false));
    Btn("confirm abandon",abandonConfirm.transform,"確定放棄",140,-80,260,54,()=>{abandonConfirm.SetActive(false);world.ReturnToMenu(true);},true);abandonConfirm.SetActive(false);
