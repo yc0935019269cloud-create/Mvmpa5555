@@ -14,8 +14,9 @@ namespace RefractionRoom {
   public float toastUntil;
   Font font;
   Transform root;
-  GameObject hud,station,book,pausedPanel,retPanel,pdPanel,tipBox,crossObj,touchPad,stickObj,walkButtons,knobBar,pdButtons;
-  public ClinicStick stick;CanvasScaler scaler;Text knobLabel;
+  RawImage chartRaw;Text chartTitle;
+  GameObject chartPanel,hud,station,book,pausedPanel,retPanel,pdPanel,tipBox,crossObj,touchPad,stickObj,walkButtons,knobBar,pdButtons,shadeL,shadeR;
+  public ClinicStick stick;CanvasScaler scaler;Text knobLabel,wdText,wdPrepText,wdHint,sweepText;RectTransform sweepAxis,sweepDot;
   Text task,step,patient,clock,mission,helper,context,toast,conversation,readout,retReadout,record,bookTitle,previewLabel,patientChoice,tip,pdText,pdReading;
   Button next,resume;
   List<Button> prepButtons=new List<Button>();
@@ -49,7 +50,7 @@ namespace RefractionRoom {
    touchPad=Panel("Touch pad",hud.transform,0,0,4000,3000,new Vector2(.5f,.5f),new Color(0,0,0,0));touchPad.AddComponent<ClinicTouchPad>().world=world;
    var top=Panel("Header",hud.transform,0,413,1540,55,new Vector2(.5f,.5f),dark);
    Txt("brand",top.transform,"視光室  /  REFRACTION",-587,0,320,50,19,pale,new Vector2(.5f,.5f));
-   patient=Txt("patient",top.transform,"",-228,0,320,50,18,muted,new Vector2(.5f,.5f));
+   patient=Txt("patient",top.transform,"",-190,0,420,50,17,muted,new Vector2(.5f,.5f));
    clock=Txt("clock",top.transform,"",122,0,330,50,18,accent,new Vector2(.5f,.5f));
    Btn("notebook",top.transform,"病歷  Tab",445,0,130,38,()=>world.ToggleNotebook());
    Btn("voice",top.transform,"語音 開／關",589,0,140,38,()=>{voice=!voice;world.Toast(voice?"受測者語音已開啟。":"受測者語音已關閉。 ");});
@@ -86,20 +87,32 @@ namespace RefractionRoom {
    Btn("larger",station.transform,"大一列 ↑",-238,-63,132,39,()=>world.Row(-1));
    Btn("smaller",station.transform,"小一列 ↓",-97,-63,132,39,()=>world.Row(1));
    Btn("hold ret",station.transform,"取／放檢影鏡",62,-63,174,39,()=>world.HoldRet());
-   Btn("WD",station.transform,"扣工作距離",244,-63,170,39,()=>world.RemoveWD());
+   Btn("WD",station.transform,"扣工作距離 WD",244,-63,170,39,()=>world.RemoveWD());
    Btn("leave",station.transform,"回診間 F",433,-63,185,39,()=>world.Focus());
    previewLabel=Txt("station help",station.transform,"直接操作：滑鼠指向儀器上的旋鈕，滾輪轉動、左鍵＋右鍵−（外側大轉盤＝球面、下方內鈕＝柱面、外圈＝軸位、上方小鈕＝輔助鏡片）",0,-105,1080,31,15,muted,new Vector2(.5f,.5f));
-   var prep=Panel("Preparation",hud.transform,585,89,360,440,new Vector2(.5f,.5f),dark);
-   Txt("prep title",prep.transform,"診間準備",0,193,315,43,23,pale,new Vector2(.5f,.5f));
-   for(int i=0;i<9;i++){int p=i;prepButtons.Add(Btn("prep"+i,prep.transform,ClinicSession.PrepNames[i],0,149-i*39,318,34,()=>world.Prepare(p)));}
+   var prep=Panel("Preparation",hud.transform,585,60,360,500,new Vector2(.5f,.5f),dark);
+   Txt("prep title",prep.transform,"診間準備",0,223,315,43,23,pale,new Vector2(.5f,.5f));
+   for(int i=0;i<9;i++){int p=i;prepButtons.Add(Btn("prep"+i,prep.transform,ClinicSession.PrepNames[i],0,179-i*39,318,34,()=>world.Prepare(p)));}
+   Txt("wd title",prep.transform,"檢影工作距離",-80,-178,160,30,16,muted,new Vector2(.5f,.5f));
+   Btn("wd prev",prep.transform,"◀",-118,-212,60,40,()=>world.ShiftWD(-1));Btn("wd next",prep.transform,"▶",118,-212,60,40,()=>world.ShiftWD(1));
+   wdPrepText=Txt("wd value",prep.transform,"",0,-212,170,40,20,accent,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
+   chartPanel=Panel("Chart view",hud.transform,600,240,344,284,new Vector2(.5f,.5f),dark);
+   chartTitle=Txt("chart title",chartPanel.transform,"6 m 視標",0,124,320,30,16,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
+   var chartImg=new GameObject("Chart image",typeof(RectTransform),typeof(RawImage));Rect(chartImg,chartPanel.transform,0,-14,320,240,new Vector2(.5f,.5f));chartImg.GetComponent<RawImage>().texture=world.ChartTexture;chartImg.GetComponent<RawImage>().raycastTarget=false;chartRaw=chartImg.GetComponent<RawImage>();
    retPanel=Panel("Retinoscope view",hud.transform,600,136,332,472,new Vector2(.5f,.5f),dark);
    Txt("ret title",retPanel.transform,"檢影鏡窺孔 · 放大觀察",0,211,306,40,18,pale,new Vector2(.5f,.5f));
    var raw=new GameObject("Pupil camera",typeof(RectTransform),typeof(RawImage));Rect(raw,retPanel.transform,0,45,290,290,new Vector2(.5f,.5f));raw.GetComponent<RawImage>().texture=scope;raw.GetComponent<RawImage>().raycastTarget=false;
    retReadout=Txt("reflex description",retPanel.transform,"",0,-129,306,55,18,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
-   Btn("streak minus",retPanel.transform,"光帶 −15°  Z",-78,-175,148,35,()=>world.Streak(-1));
-   Btn("streak plus",retPanel.transform,"光帶 +15°  X",78,-175,148,35,()=>world.Streak(1));
+   Btn("streak minus",retPanel.transform,"−15° Z",-110,-175,92,35,()=>world.Streak(-1));
+   Btn("streak 90",retPanel.transform,"+90° Q",0,-175,110,35,()=>world.Streak90(),true);
+   Btn("streak plus",retPanel.transform,"+15° X",110,-175,92,35,()=>world.Streak(1));
    Btn("sweep",retPanel.transform,"自動掃動 E",-78,-216,148,35,()=>world.Sweep(),true);
-   Btn("work distance",retPanel.transform,"工作距離",78,-216,148,35,()=>world.WorkingDistance());
+   Btn("wd minus",retPanel.transform,"◀",28,-216,44,35,()=>world.ShiftWD(-1));Btn("wd plus",retPanel.transform,"▶",132,-216,44,35,()=>world.ShiftWD(1));
+   wdText=Txt("wd ret",retPanel.transform,"",80,-216,60,35,15,accent,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
+   // sweep indicator drawn over the eyepiece view: the axis of the sweep and where the streak is now
+   var axisGo=new GameObject("Sweep axis",typeof(RectTransform),typeof(Image));sweepAxis=Rect(axisGo,retPanel.transform,0,45,270,3,new Vector2(.5f,.5f));axisGo.GetComponent<Image>().color=new Color(1,.85f,.4f,.55f);axisGo.GetComponent<Image>().raycastTarget=false;
+   var dotGo=new GameObject("Sweep dot",typeof(RectTransform),typeof(Image));sweepDot=Rect(dotGo,retPanel.transform,0,45,16,16,new Vector2(.5f,.5f));dotGo.GetComponent<Image>().color=new Color(1,.92f,.55f,.95f);dotGo.GetComponent<Image>().raycastTarget=false;
+   sweepText=Txt("sweep text",retPanel.transform,"",0,182,300,26,15,accent,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
 
    pdPanel=Panel("PD measurement",hud.transform,-560,-150,420,330,new Vector2(.5f,.5f),dark);
    Txt("pd title",pdPanel.transform,"量瞳距 PD · 對應邊緣法",0,138,380,36,21,accent,new Vector2(.5f,.5f));
@@ -122,6 +135,11 @@ namespace RefractionRoom {
    Btn("knob plus",knobBar.transform,"+",205,0,90,62,()=>world.TouchStep(1),true);
    Btn("knob close",knobBar.transform,"✕",305,0,62,62,()=>world.touchSel="");
    knobLabel=Txt("knob label",knobBar.transform,"",-45,0,400,70,16,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
+   // closed-eye cue while measuring PD: the side of the examiner's closed eye is dimmed
+   shadeL=Panel("Closed left eye",hud.transform,-660,0,340,3000,new Vector2(.5f,.5f),new Color(0,0,0,.55f));shadeL.GetComponent<Image>().raycastTarget=false;
+   shadeR=Panel("Closed right eye",hud.transform,660,0,340,3000,new Vector2(.5f,.5f),new Color(0,0,0,.55f));shadeR.GetComponent<Image>().raycastTarget=false;
+   Txt("closed L",shadeL.transform,"你的左眼閉上",40,0,240,40,20,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter).raycastTarget=false;
+   Txt("closed R",shadeR.transform,"你的右眼閉上",-40,0,240,40,20,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter).raycastTarget=false;
    pdButtons=Panel("PD buttons",hud.transform,-560,-375,420,96,new Vector2(.5f,.5f),dark);
    Btn("pd say",pdButtons.transform,"①「請看我的眼睛」",-104,22,200,40,()=>world.PDInstruct());
    Btn("pd right",pdButtons.transform,"② 閉右眼 Q",104,22,200,40,()=>world.PDClose(1));
@@ -152,14 +170,21 @@ namespace RefractionRoom {
     else if(y<-100){c.anchorMin=c.anchorMax=new Vector2(.5f,0);c.anchoredPosition=new Vector2(c.anchoredPosition.x,y+450);}}
    Refresh();
   }
+  void Update(){
+   if(!world||!retPanel||!retPanel.activeSelf||sweepAxis==null)return;var s=world.session;
+   float ang=s.streak+90;sweepAxis.localRotation=Quaternion.Euler(0,0,ang);
+   Vector2 d=new Vector2(Mathf.Cos(ang*Mathf.Deg2Rad),Mathf.Sin(ang*Mathf.Deg2Rad));sweepDot.anchoredPosition=new Vector2(0,45)+d*world.sweep*120;
+   sweepText.text=Mathf.Abs(world.sweep)<.08f?"光帶在中央 · 拖曳掃動":"光帶正往 "+(Mathf.Abs(d.x)>Mathf.Abs(d.y)?(d.x*world.sweep>0?"右 →":"← 左"):(d.y*world.sweep>0?"上 ↑":"↓ 下"))+" 掃";
+  }
   void CaseLabel(){var s=new ClinicSession();s.patient=selectedPatient;patientChoice.text="病例 "+selectedPatient.ToString("00")+"  /  "+s.PatientName;}
   public void Refresh(){if(!world||!root)return;scaler.matchWidthOrHeight=Screen.height>0&&(float)Screen.width/Screen.height<1.7f?0:1;var s=world.session;bool play=world.begun;hud.SetActive(play);book.SetActive(play&&world.notebook);pausedPanel.SetActive(play&&world.paused);resume.interactable=canResume;
    if(!play)return;
    task.text=s.StageTitle;step.text="STEP "+(s.stage+1).ToString("00")+" / 17  ·  "+s.mode;
    task.transform.parent.gameObject.SetActive(!immersive&&!world.cinematic);
-   patient.text=s.PatientName+" · 病例 "+s.patient.ToString("00")+" · "+s.EyeName;
+   patient.text=s.PatientName+" · 病例 "+s.patient.ToString("00")+" · "+s.EyeName+" · WD "+s.wdCm+"cm";
+   string wdLabel=s.wdCm+" cm · "+Optics.WD(s.wdCm).ToString("0.00")+" D";if(wdPrepText)wdPrepText.text=wdLabel;if(wdText)wdText.text=s.wdCm+"cm";
    int sec=Mathf.FloorToInt(s.mode=="考試"?Mathf.Max(0,1080-s.seconds):s.seconds);clock.text=(s.mode=="考試"?"剩餘 ":"練習 ")+string.Format("{0:00}:{1:00}",sec/60,sec%60)+"  /  六公尺視標";
-   var missing=s.Missing();mission.text=s.mode=="考試"?"依期中檢查流程獨立操作。\n完成時按 Enter 前往下一階段。":missing.Count==0?"✓ 這一步的條件已完成。\n按 Enter 前往下一步。":string.Join("\n",missing.GetRange(0,Mathf.Min(4,missing.Count)).ConvertAll(x=>"· "+x));
+   var missing=s.Missing();mission.text=s.mode=="考試"?"依期中檢查流程獨立操作。\n完成時按 Enter 前往下一階段。":missing.Count==0?"✓ 這一步的條件已完成。\n按 Enter 前往下一步。":string.Join("\n",missing.GetRange(0,Mathf.Min(4,missing.Count)).ConvertAll(x=>"・"+x));
    next.interactable=!world.busy&&(missing.Count==0||s.mode=="自由"||s.mode=="考試");
    bool showHints=hints&&s.mode!="考試";helper.transform.parent.gameObject.SetActive(showHints&&!immersive&&!world.cinematic&&world.pdStep<0);helper.text=showHints?Hint():"";
    context.text=!world.focused&&!world.patientView?(world.focusLabel!=""?(world.touchMode?"點一下：":"E  ")+world.focusLabel:(world.touchMode?"左下搖桿走路、拖曳畫面轉頭、點物件互動":"走近工具或受測者 · F 坐近驗光儀")):world.patientView?"受測者視野（模糊示意） · C 返回":"";
@@ -170,6 +195,7 @@ namespace RefractionRoom {
    touchPad.SetActive(touchUI);stickObj.SetActive(touchUI&&!world.focused&&!pd&&!world.patientView);walkButtons.SetActive(touchUI&&!world.focused&&!pd);
    knobBar.SetActive(touchUI&&world.focused&&!pd&&world.touchSel!="");if(knobBar.activeSelf)knobLabel.text=world.hoverLabel;
    pdButtons.SetActive(pd&&!world.paused);
+   shadeR.SetActive(pd&&world.examinerEye==1);shadeL.SetActive(pd&&world.examinerEye==2);
    ((RectTransform)conversation.transform.parent).anchoredPosition=new Vector2(pd?0:100,pd?-345:-110);
    station.SetActive(world.focused&&!pd&&!world.cinematic&&!world.patientView&&!world.notebook&&!world.paused&&!immersive);
    crossObj.SetActive(!world.focused&&!pd&&!world.cinematic);
@@ -185,9 +211,11 @@ namespace RefractionRoom {
    var prep=prepButtons[0].transform.parent.gameObject;prep.SetActive(s.stage==0&&!pd&&!world.cinematic&&!world.notebook&&!world.paused&&!immersive);
    for(int i=0;i<9;i++)prepButtons[i].GetComponentInChildren<Text>().text=(s.prepared[i]?"✓  ":"")+ClinicSession.PrepNames[i];
    retPanel.SetActive(world.focused&&world.held==1&&!world.patientView&&!world.notebook&&!world.paused);
+   chartPanel.SetActive(world.focused&&world.held!=1&&s.stage>=4&&world.pdStep<0&&!world.patientView&&!world.notebook&&!world.paused&&!world.cinematic);
+   if(chartPanel.activeSelf){float z=world.ChartZoom;chartRaw.uvRect=new Rect(.5f-z/2,.5f-z/2,z,z);chartTitle.text=s.chart==1?"6 m 視標 · 紅綠":s.chart==2?"6 m 視標 · 點陣（JCC）":"6 m 視標 · 目前這一列 "+s.row.ToString("0.0")+"（放大顯示）";}
    if(pd||world.cinematic)context.text="";
    float r=Optics.RetResidual(s.Truth(s.eye),s.H.lens,Optics.WD(s.wdCm),s.streak);
-   retReadout.text="光帶 "+s.streak.ToString("0")+"° · WD "+s.wdCm+"cm · 按住左鍵拖曳掃動\n"+(showHints?(Mathf.Abs(r)<.125f?"中和":r<0?"順動 → 加正鏡":"逆動 → 加負鏡"):"觀察反射光與光帶的相對移動");
+   retReadout.text="光帶 "+world.StreakName()+" · WD "+s.wdCm+"cm · 按住左鍵拖曳掃動\n"+(showHints?(Mathf.Abs(r)<.125f?"中和":r<0?"順動 → 加正鏡":"逆動 → 加負鏡"):"觀察反射光與光帶的相對移動");
    if(world.notebook)Records();
   }
   string Hint(){var s=world.session;if(s.mode=="自由")return "自由練習參考（近似病例）\nOD "+s.Truth(0)+"\nOS "+s.Truth(1)+"\nPD "+s.TruePD+" mm";
@@ -205,10 +233,10 @@ namespace RefractionRoom {
   void Records(){var s=world.session;bookTitle.text=s.completed?"本 次 練 習 回 饋":"驗 光 紀 錄  /  "+s.PatientName;
    System.Func<int,string> eyeTag=e=>e==0?"OD":"OS";
    string text="工作距離  "+s.wdCm+" cm    受測者  "+s.PatientName+"    PD  "+s.pd.ToString("0.#")+" mm    Date  "+System.DateTime.Now.ToString("yyyy / MM / dd")+"    模式 "+s.mode+"\n\n";
-   text+="① Retinoscopy（淨檢影值）\n";for(int e=0;e<2;e++){var h=s.eyes[e];text+="   "+eyeTag(e)+":  "+(h.netSaved?h.net.ToString():"待記錄")+"      VA:  "+(h.vaSaved?h.measuredVA.ToString("0.0")+(h.phRead?"  (PH "+h.phVA.ToString("0.0")+")":""):"待記錄")+(h.grossSaved?"      Gross "+h.gross:"")+"\n";}
-   text+="\n② 1st MPMVA\n";for(int e=0;e<2;e++){var h=s.eyes[e];text+="   "+eyeTag(e)+":  "+(h.mp1Saved?h.mp1.ToString():"待記錄")+"      VA:  "+(h.mp1Saved?h.mp1VA.ToString("0.0"):"待記錄")+(h.duoAsked?"      紅綠 ✓":"")+"\n";}
+   text+="① Retinoscopy（淨檢影值）\n";for(int e=0;e<2;e++){var h=s.eyes[e];text+="   "+eyeTag(e)+":  "+(h.netSaved?h.net.ToString():"待記錄")+"      VA:  "+(h.vaSaved?h.vaText+(h.phRead?"  (PH "+h.phVAText+")":""):"待記錄")+(h.grossSaved?"      Gross "+h.gross:"")+"\n";}
+   text+="\n② 1st MPMVA\n";for(int e=0;e<2;e++){var h=s.eyes[e];text+="   "+eyeTag(e)+":  "+(h.mp1Saved?h.mp1.ToString():"待記錄")+"      VA:  "+(h.mp1Saved?h.mp1VAText:"待記錄")+(h.duoAsked?"      紅綠 ✓":"")+"\n";}
    text+="\n③ JCC\n";for(int e=0;e<2;e++){var h=s.eyes[e];text+="   "+eyeTag(e)+":  "+(h.jccSaved?h.jccResult.ToString()+"   ("+h.route+")":"待記錄")+"\n";}
-   text+="\n④ 2nd MPMVA\n";for(int e=0;e<2;e++){var h=s.eyes[e];text+="   "+eyeTag(e)+":  "+(h.finalSaved?h.final.ToString():"待記錄")+"      VA:  "+(h.finalSaved?h.finalVA.ToString("0.0"):"待記錄")+"\n";if(h.finalSaved&&h.finalKey!=s.LensKey(e))text+="   ＊"+eyeTag(e)+" 鏡片已變更，需重新記錄。\n";}
+   text+="\n④ 2nd MPMVA\n";for(int e=0;e<2;e++){var h=s.eyes[e];text+="   "+eyeTag(e)+":  "+(h.finalSaved?h.final.ToString():"待記錄")+"      VA:  "+(h.finalSaved?h.finalVAText:"待記錄")+"\n";if(h.finalSaved&&h.finalKey!=s.LensKey(e))text+="   ＊"+eyeTag(e)+" 鏡片已變更，需重新記錄。\n";}
    if(s.completed){text+="\n流程回饋  "+s.Score()+" / 100    ·    "+s.events.Count+" 次操作\n";text+="參考病例：OD "+s.Truth(0)+"  /  OS "+s.Truth(1)+"\n";if(s.examErrors.Count>0)text+="待改進項目\n"+string.Join("\n",s.examErrors)+"\n";}
    text+="\n本次只涵蓋期中：檢影、單眼自覺式驗光、JCC。\n受測者回答及模糊是教學近似模型；此紀錄不是臨床處方。";record.text=text;var rt=record.GetComponent<RectTransform>();rt.sizeDelta=new Vector2(rt.sizeDelta.x,Mathf.Max(560,record.preferredHeight+24));
   }

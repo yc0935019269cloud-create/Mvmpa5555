@@ -1,4 +1,4 @@
 Result: Succeeded
-Size: 7656023
-Time: 00:01:05.7286353
+Size: 7664864
+Time: 00:01:32.0979028
 Errors: 0

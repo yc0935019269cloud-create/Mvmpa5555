@@ -1,7 +1,7 @@
 PASS TABO 180-degree wrap
 PASS 0 and 180 are identical cylinder axes
 PASS Cylinder has no power along its axis
-PASS Working-distance diopters
+PASS Working-distance diopters (40/50/57/67/100 cm)
 PASS Patient pupil to calibrated wall display is six metres
 PASS Aligned rear face of the lens batteries is twelve millimetres from the pupil
 PASS Both principal meridians neutral at true Rx plus WD
@@ -13,6 +13,7 @@ PASS Over-minus gives green-clear response: add plus
 PASS Correct Rx has good acuity
 PASS Pinhole improves optical blur in this model
 PASS Balanced axis produces equal JCC responses
+PASS Partial-line VA notation: 1.2 two letters = 1.0 +2, 1.0 three = 1.0 -2, 1.0 one = 0.9 +1
 PASS Two -0.25 cylinder steps compensated by +0.25 sphere
 PASS Case 1 requires all nine preparation actions
 PASS Case 1 preparation passes
@@ -246,4 +247,4 @@ PASS Case 6 completes the midterm workflow
 PASS Case 6 full workflow scores 100
 PASS Exam allows progression and records unmet criteria without giving hints
 PASS An unattempted clinical case does not receive clinical points
-248 checks passed
+249 checks passed

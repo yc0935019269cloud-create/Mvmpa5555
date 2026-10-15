@@ -37,7 +37,7 @@ public static class ClinicBuild {
   Check(Optics.AxisError(175,5)==10,"TABO 180-degree wrap");
   Check(Vector3.Distance(Optics.Power(new Rx(-2,-1,180)),Optics.Power(new Rx(-2,-1,0)))<.0001f,"0 and 180 are identical cylinder axes");
   Check(Mathf.Abs(Optics.Meridian(new Rx(-2,-1,180),180)+2)<.001f&&Mathf.Abs(Optics.Meridian(new Rx(-2,-1,180),90)+3)<.001f,"Cylinder has no power along its axis");
-  Check(Optics.WD(50)==2&&Optics.WD(67)==1.5f&&Optics.WD(100)==1,"Working-distance diopters");
+  Check(Optics.WD(50)==2&&Optics.WD(57)==1.75f&&Optics.WD(67)==1.5f&&Optics.WD(100)==1&&Optics.WD(40)==2.5f,"Working-distance diopters (40/50/57/67/100 cm)");
   Check(Mathf.Abs((4.475f-(-1.525f))-6)<.0001f,"Patient pupil to calibrated wall display is six metres");
   Check(Mathf.Abs((4.475f-4.463f)*1000-12)<.001f,"Aligned rear face of the lens batteries is twelve millimetres from the pupil");
   var truth=new Rx(-2,-1,180);var gross=new Rx(-.5f,-1,180);
@@ -50,16 +50,17 @@ public static class ClinicBuild {
   Check(Optics.Acuity(truth,truth)>.99f,"Correct Rx has good acuity");
   Check(Optics.Acuity(truth,new Rx(0,0,180),true)>Optics.Acuity(truth,new Rx(0,0,180)),"Pinhole improves optical blur in this model");
   Check(Optics.CompareJCC(truth,truth,true).StartsWith("兩片"),"Balanced axis produces equal JCC responses");
+  {float b,l;Check(Optics.VALabel(1.2f,2,out b,out l)=="1.0 +2"&&Optics.VALabel(1f,3,out b,out l)=="1.0 -2"&&Optics.VALabel(1f,1,out b,out l)=="0.9 +1"&&Optics.VALabel(1f,5,out b,out l)=="1.0","Partial-line VA notation: 1.2 two letters = 1.0 +2, 1.0 three = 1.0 -2, 1.0 one = 0.9 +1");}
   var comp=new ClinicSession();comp.stage=8;comp.H.lens=new Rx(-2,-.5f,180);float eq=Optics.Power(comp.H.lens).x;comp.Adjust(1,-1);comp.Adjust(1,-1);Check(Mathf.Abs(eq-Optics.Power(comp.H.lens).x)<.001f,"Two -0.25 cylinder steps compensated by +0.25 sphere");
   for(int patient=1;patient<=6;patient++){
    var s=new ClinicSession();s.patient=patient;
    Check(s.Missing().Count==9,"Case "+patient+" requires all nine preparation actions");
    for(int i=0;i<9;i++)s.prepared[i]=true;Check(s.Advance(),"Case "+patient+" preparation passes");
    for(int e=0;e<2;e++){
-    Rx r=s.Truth(e);s.eyes[e].lens=new Rx(r.s+1.5f,r.c,r.a);s.eyes[e].sweeps=2;s.Save();Check(s.Advance(),"Case "+patient+" eye "+e+" gross retinoscopy");
+    Rx r=s.Truth(e);s.eyes[e].lens=new Rx(r.s+Optics.WD(s.wdCm),r.c,r.a);s.eyes[e].sweeps=2;s.Save();Check(s.Advance(),"Case "+patient+" eye "+e+" gross retinoscopy");
    }
    Check(!s.Advance(),"Case "+patient+" WD must be deducted and recorded");
-   foreach(var h in s.eyes){Rx r=h.lens;r.s-=1.5f;h.lens=r;}s.wdRemoved=true;s.Save();Check(s.Advance(),"Case "+patient+" net retinoscopy");
+   foreach(var h in s.eyes){Rx r=h.lens;r.s-=Optics.WD(s.wdCm);h.lens=r;}s.wdRemoved=true;s.Save();Check(s.Advance(),"Case "+patient+" net retinoscopy");
    // ① VA through the net retinoscopy result, OD then OS
    for(int e=0;e<2;e++){Check(s.eye==e&&s.Phase==0,"Case "+patient+" eye "+e+" net-RET VA in OD then OS order");Check(s.H.lens.ToString()==s.H.net.ToString(),"Case "+patient+" eye "+e+" VA starts from the net retinoscopy");s.occluded=true;s.row=.1f;s.Read();s.row=.6f;s.Read();if(s.H.measuredVA<.8f){s.ph=true;s.Read();s.ph=false;}s.Save();Check(s.Advance(),"Case "+patient+" eye "+e+" RET VA recorded");}
    // ② 1st MPMVA then duochrome for each eye before any JCC
@@ -114,7 +115,7 @@ public static class ClinicBuild {
   PlayerSettings.WebGL.initialMemorySize=128;PlayerSettings.WebGL.maximumMemorySize=512;PlayerSettings.WebGL.memoryGrowthMode=WebGLMemoryGrowthMode.Geometric;PlayerSettings.WebGL.template="PROJECT:Clinic";
   PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.WebGL,ManagedStrippingLevel.Low);
   QualitySettings.SetQualityLevel(2);QualitySettings.antiAliasing=4;QualitySettings.pixelLightCount=6;QualitySettings.shadowDistance=9;QualitySettings.shadows=ShadowQuality.All;QualitySettings.shadowResolution=ShadowResolution.High;QualitySettings.shadowCascades=2;QualitySettings.realtimeReflectionProbes=true;QualitySettings.softParticles=false;QualitySettings.vSyncCount=0;
-  var graphics=AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/GraphicsSettings.asset").FirstOrDefault();if(graphics){var so=new SerializedObject(graphics);var shaders=so.FindProperty("m_AlwaysIncludedShaders");shaders.ClearArray();foreach(string sn in new[]{"Standard","Unlit/Texture","Unlit/Color","Clinic/RetinalReflex","Clinic/Text3D","Clinic/Mist","Clinic/Screen","Hidden/Clinic/Post","UI/Default"}){var shader=Shader.Find(sn);if(shader){int n=shaders.arraySize;shaders.InsertArrayElementAtIndex(n);shaders.GetArrayElementAtIndex(n).objectReferenceValue=shader;}}so.ApplyModifiedProperties();}
+  var graphics=AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/GraphicsSettings.asset").FirstOrDefault();if(graphics){var so=new SerializedObject(graphics);var shaders=so.FindProperty("m_AlwaysIncludedShaders");shaders.ClearArray();foreach(string sn in new[]{"Standard","Unlit/Texture","Unlit/Color","Clinic/RetinalReflex","Clinic/Text3D","Clinic/Mist","Clinic/Screen","Clinic/Streak","Hidden/Clinic/Post","UI/Default"}){var shader=Shader.Find(sn);if(shader){int n=shaders.arraySize;shaders.InsertArrayElementAtIndex(n);shaders.GetArrayElementAtIndex(n).objectReferenceValue=shader;}}so.ApplyModifiedProperties();}
   AssetDatabase.SaveAssets();
   var report=new List<string>();foreach(string n in new[]{"Patient","HeadPivot","Eye_OD","Pupil_OD","Pupil_OS","Phoropter","Pod_OD","Aperture_OD","Aperture_OS","Housing_OD","Sph_OD","ArmSwing","Architecture","Hand_R"}){var ts=UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include,FindObjectsSortMode.None).Where(x=>x.name==n);foreach(var t in ts)report.Add(n+" pos="+t.position+" rot="+t.eulerAngles+" scale="+t.lossyScale);}
   foreach(var mr in root.GetComponentsInChildren<MeshRenderer>())if(mr.name=="Head"||mr.name=="Foundation"||mr.name=="ChartSurface")report.Add(mr.name+" bounds="+mr.bounds);

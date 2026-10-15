@@ -26,7 +26,18 @@ namespace RefractionRoom {
    if(Mathf.Abs(first-second)<.03f)return "兩片差不多清楚。";
    return first<second?"第一片比較清楚。":"第二片比較清楚。";
   }
-  public static readonly float[] Rows={.1f,.2f,.3f,.4f,.5f,.6f,.7f,.8f,1f,1.2f};
+  public static readonly float[] Rows={.1f,.2f,.3f,.4f,.5f,.6f,.7f,.8f,.9f,1f,1.2f};
+  // Five optotypes per line, 0.02 logMAR per letter: letters correct on a line for the current lens.
+  public static int LettersRead(Rx truth,Rx lens,bool ph,float row){float v=Acuity(truth,lens,ph);float d=Mathf.Log10(row)-Mathf.Log10(v);return Mathf.Clamp(Mathf.RoundToInt(5-d/.02f),0,5);}
+  // Clinical notation: 5/5 -> line; 3-4/5 -> line -missed; 1-2/5 -> previous line +read.
+  public static string VALabel(float row,int n,out float baseVA,out float logmar){
+   int i=0;for(int k=0;k<Rows.Length;k++)if(Mathf.Abs(Rows[k]-row)<.01f)i=k;float prev=i>0?Rows[i-1]:0;
+   logmar=-Mathf.Log10(row)+.02f*(5-n);
+   if(n>=5){baseVA=row;return row.ToString("0.0");}
+   if(n>=3){baseVA=row;return row.ToString("0.0")+" -"+(5-n);}
+   if(n>=1&&i>0){baseVA=prev;return prev.ToString("0.0")+" +"+n;}
+   baseVA=prev;return n>=1?row.ToString("0.0")+" -"+(5-n):"";
+  }
   public static float BestRow(Rx truth,Rx lens,bool ph=false){float v=Acuity(truth,lens,ph),best=.1f;foreach(float row in Rows)if(row<=v+.025f)best=row;return best;}
  }
  [Serializable] public class EyeHistory {
@@ -34,7 +45,8 @@ namespace RefractionRoom {
   public bool grossSaved,netSaved,finalSaved,fogged,duoAsked,phRead;
   public int reads,axisComparisons,powerComparisons,sweeps;
   public float measuredVA,phVA,mp1VA,finalVA,cylComp,highestFog,lastStreak=-999;
-  public string finalKey="";
+  public string finalKey="",vaText="",phVAText="",mp1VAText="",finalVAText="",readKey="",readText="";
+  public float vaLog=99,phLog=99,readLog=99,readVA;public int lastLetters;
   public bool vaSaved,mp1Saved,jccSaved,secondFogged;
   public string route="APA";
   public int routeIndex,routeComparisons;
@@ -44,7 +56,7 @@ namespace RefractionRoom {
   public string mode="教學";
   public bool[] prepared=new bool[9];
   public EyeHistory[] eyes={new EyeHistory(),new EyeHistory()};
-  public float wdCm=67,pd=60,level=3,height=.1f,vertex=18,row=.6f,streak;
+  public float wdCm=57,pd=60,level=3,height=.1f,vertex=18,row=.6f,streak;
   public int chart=0,jccMode=0;
   public bool ph,occluded,wdRemoved,completed;
   public float seconds,pdMeasured,pdZeroError;
@@ -70,7 +82,7 @@ namespace RefractionRoom {
   public void EnterStage(){
    if(stage!=3&&stage<StageEye.Length)eye=StageEye[stage];
    ph=false;jccMode=0;chart=0;
-   if(Phase==0){if(H.netSaved)H.lens=H.net;H.reads=0;H.measuredVA=0;H.phRead=false;occluded=true;row=.6f;}
+   if(Phase==0){if(H.netSaved)H.lens=H.net;H.reads=0;H.measuredVA=0;H.vaLog=99;H.vaText="";H.phRead=false;occluded=true;row=.6f;}
    if(Phase==1){H.lens=H.net;H.reads=0;H.fogged=false;occluded=true;row=1;}
    if(Phase==2)chart=1;
    if(Phase==3){chart=2;H.route=Mathf.Abs(H.lens.c)>=.75f?"APA":"PPAP";H.routeIndex=0;H.routeComparisons=0;jccMode=JCCPattern[0];}
@@ -89,18 +101,22 @@ namespace RefractionRoom {
    Log("調鏡 "+(e==0?"右眼 OD":"左眼 OS")+" "+r);
   }
   public void Read(){
-   H.reads++;float best=Optics.BestRow(Truth(eye),H.lens,ph);
-   if(Phase==0&&!ph)H.measuredVA=Mathf.Max(H.measuredVA,Mathf.Min(row,best));
-   if(ph){H.phRead=true;H.phVA=Mathf.Max(H.phVA,Mathf.Min(row,best));}
-   H.finalVA=best;Log("讀 VA "+row.ToString("0.0")+" PH="+ph);
+   H.reads++;int n=Optics.LettersRead(Truth(eye),H.lens,ph,row);float bv,lm;string lab=Optics.VALabel(row,n,out bv,out lm);H.lastLetters=n;
+   string key=LensKey(eye)+(ph?"PH":"");if(H.readKey!=key){H.readKey=key;H.readLog=99;H.readText="";H.readVA=0;}
+   if(n>0&&lm<H.readLog){H.readLog=lm;H.readText=lab;H.readVA=bv;}
+   if(Phase==0&&!ph&&n>0&&lm<H.vaLog){H.vaLog=lm;H.vaText=lab;H.measuredVA=bv;}
+   if(ph&&n>0){H.phRead=true;if(lm<H.phLog){H.phLog=lm;H.phVAText=lab;H.phVA=bv;}}
+   if(ph&&n==0)H.phRead=true;
+   H.finalVA=H.readVA;Log("讀 VA 列 "+row.ToString("0.0")+" 對 "+n+"/5"+(ph?" PH":"")+(lab!=""?" → "+lab:""));
   }
+  public string CurrentVAText(){return H.readKey==LensKey(eye)&&H.readText!=""?H.readText:"未讀";}
   public void Save(){
    if(stage==1||stage==2){H.gross=H.lens;H.grossSaved=true;}
    else if(stage==3){foreach(var h in eyes){h.net=h.lens;h.netSaved=true;}}
    else if(Phase==0)H.vaSaved=true;
-   else if(Phase==1){H.mp1=H.lens;H.mp1VA=H.finalVA;H.mp1Saved=true;}
+   else if(Phase==1){H.mp1=H.lens;H.mp1VA=H.readKey==LensKey(eye)?H.readVA:0;H.mp1VAText=CurrentVAText();H.mp1Saved=true;}
    else if(Phase==4){H.jccResult=H.lens;H.jccSaved=true;}
-   else if(Phase==5){H.final=H.lens;H.finalSaved=true;H.finalKey=LensKey(eye);}
+   else if(Phase==5){H.final=H.lens;H.finalVA=H.readKey==LensKey(eye)?H.readVA:0;H.finalVAText=CurrentVAText();H.finalSaved=true;H.finalKey=LensKey(eye);}
    Log("寫入紀錄");
   }
   public List<string> Missing(){

@@ -34,7 +34,7 @@ namespace RefractionRoom {
   class Drive {public Vector3 p;public Quaternion q;public float rate;}
   Dictionary<Transform,Drive> drives=new Dictionary<Transform,Drive>();
   List<Light> lamps=new List<Light>();
-  Light streakLight;
+  Light streakLight;Transform streakStrip;Material streakMat;
   ClinicPost post;
   ParticleSystem mist,sheen;
   Material[] reflex=new Material[2];
@@ -61,6 +61,8 @@ namespace RefractionRoom {
   public int mouseDowns;public string uiHit="";
   const float ZF=4.390f,ZR=4.463f;
   static readonly string[] EN={"OD","OS"};
+  public Texture2D ChartTexture{get{return chartTex;}}
+  public float ChartZoom=1;
   public Transform N(string name){Transform t;return nodes.TryGetValue(name,out t)?t:null;}
   void Awake(){Main=this;}
   static Transform Deep(Transform t,string name){if(t.name==name)return t;foreach(Transform c in t){var r=Deep(c,name);if(r)return r;}return null;}
@@ -99,7 +101,8 @@ namespace RefractionRoom {
     var g=DisplayQuad("PupilReflex_"+e);reflex[e]=new Material(Shader.Find("Clinic/RetinalReflex"));g.GetComponent<Renderer>().material=reflex[e];g.SetActive(false);nodes[g.name]=g.transform;
     var pupil=N("Pupil_"+EN[e]);if(pupil){g.transform.SetParent(pupil,false);g.transform.localPosition=new Vector3(0,0,-.00035f);g.transform.localScale=Vector3.one*.0042f;}
    }
-   var sl=new GameObject("Retinoscope streak");streakLight=sl.AddComponent<Light>();streakLight.type=LightType.Spot;streakLight.spotAngle=6;streakLight.range=1.4f;streakLight.intensity=1.6f;streakLight.color=new Color(1,.93f,.78f);streakLight.shadows=LightShadows.None;streakLight.cookie=StreakCookie();streakLight.enabled=false;
+   var sl=new GameObject("Retinoscope streak");streakLight=sl.AddComponent<Light>();streakLight.type=LightType.Spot;streakLight.spotAngle=12;streakLight.range=1.4f;streakLight.intensity=.9f;streakLight.color=new Color(1,.93f,.78f);streakLight.shadows=LightShadows.None;streakLight.enabled=false;
+   var strip=DisplayQuad("Retinoscope streak on face");streakMat=new Material(Shader.Find("Clinic/Streak"));strip.GetComponent<Renderer>().sharedMaterial=streakMat;strip.GetComponent<Renderer>().shadowCastingMode=UnityEngine.Rendering.ShadowCastingMode.Off;streakStrip=strip.transform;strip.SetActive(false);
    mist=Particles("Alcohol mist",new Color(.85f,.95f,1f,.5f));sheen=Particles("Wipe sheen",new Color(.9f,.97f,1f,.6f));
    chartTex=new Texture2D(1024,768,TextureFormat.RGB24,false);chartTex.filterMode=FilterMode.Bilinear;
    foreach(string chartPart in new[]{"ChartFrame","ChartSurface","ChartStand","ChartFoot"})if(N(chartPart))N(chartPart).position+=new Vector3(0,0,-.06f);
@@ -217,7 +220,7 @@ namespace RefractionRoom {
      if(Input.GetKeyDown(KeyCode.Return)&&focused)Next();
      if(Input.GetKeyDown(KeyCode.UpArrow)&&focused)Row(-1);
      if(Input.GetKeyDown(KeyCode.DownArrow)&&focused)Row(1);
-     if(focused&&held==1){if(Input.GetKeyDown(KeyCode.Z))Streak(-1);if(Input.GetKeyDown(KeyCode.X))Streak(1);}
+     if(focused&&held==1){if(Input.GetKeyDown(KeyCode.Z))Streak(-1);if(Input.GetKeyDown(KeyCode.X))Streak(1);if(Input.GetKeyDown(KeyCode.Q))Streak90();}
      if(focused&&!patientView&&!touchMode){
       RaycastHit kh;if(!overUI&&Physics.Raycast(view.ScreenPointToRay(Input.mousePosition),out kh,1.5f,1<<9))hover=kh.collider.GetComponent<ClinicTarget>();
       if(hover){hoverLabel=hover.label+"\n"+ControlState(hover.id);
@@ -418,13 +421,19 @@ namespace RefractionRoom {
    bool on=held==1&&begun&&!notebook;
    streakLight.enabled=on&&focused&&!patientView;
    for(int e=0;e<2;e++){var g=N("PupilReflex_"+e);if(g)g.gameObject.SetActive(on&&focused);}
-   if(!on){if(scope)scope.enabled=false;return;}
+   if(!on){if(scope)scope.enabled=false;if(streakStrip)streakStrip.gameObject.SetActive(false);return;}
    float phi=(session.streak+90)*Mathf.Deg2Rad;Vector3 dir=new Vector3(Mathf.Cos(phi),Mathf.Sin(phi),0);
    Vector3 eyeP=PupilWorld(session.eye);
    float pupilR=.0021f*(N("Pupil_"+EN[session.eye])?N("Pupil_"+EN[session.eye]).lossyScale.x:1);
    Vector3 intercept=eyeP+dir*sweep*.018f;
    streakLight.transform.position=view.transform.position+view.transform.TransformDirection(new Vector3(0,-.01f,.02f));
-   streakLight.transform.rotation=Quaternion.LookRotation(intercept-streakLight.transform.position,new Vector3(Mathf.Cos(session.streak*Mathf.Deg2Rad),Mathf.Sin(session.streak*Mathf.Deg2Rad),0));
+   streakLight.transform.rotation=Quaternion.LookRotation(intercept-streakLight.transform.position,Vector3.up);
+   // the streak intercept: a line on the face oriented at the streak angle (0° horizontal, 90° vertical as the examiner sees it)
+   streakStrip.gameObject.SetActive(focused&&!patientView);streakStrip.position=intercept+new Vector3(0,0,-.006f);streakStrip.rotation=Quaternion.Euler(0,0,session.streak);streakStrip.localScale=new Vector3(.075f,.0042f,1);
+   streakMat.SetVector("_Hole",new Vector4(eyeP.x,eyeP.y,eyeP.z,pupilR));
+   var slit=N("RetStreak");if(slit)slit.localRotation=Quaternion.Euler(0,0,90-session.streak);
+   // streak orientation comes from turning the sleeve roller on the handle, not from twisting the whole scope
+   foreach(string sn in new[]{"RetSleeve","RetSleeveKnurl"}){var sl=N(sn);if(sl)sl.localRotation=Quaternion.Slerp(sl.localRotation,Quaternion.Euler(0,session.streak*2,0),Time.deltaTime*10);}
    for(int e=0;e<2;e++){
     float res;float band=ReflexAngle(e,out res);float abs=Mathf.Abs(res);
     float neutral=1-Mathf.SmoothStep(0,1,Mathf.InverseLerp(.06f,.14f,abs));
@@ -434,14 +443,19 @@ namespace RefractionRoom {
     m.SetFloat("_Width",Mathf.Lerp(.22f,.85f,1/(1+abs*1.6f)));m.SetFloat("_Bright",Mathf.Lerp(.35f,1.1f,1/(1+abs*.9f))*(.55f+.45f*Mathf.Clamp01(1-Mathf.Abs(sweep)*.6f)));m.SetFloat("_Neutral",neutral);
    }
    scope.transform.position=eyeP+new Vector3(0,0,-.11f);scope.transform.rotation=Quaternion.identity;scope.enabled=focused&&!notebook&&!patientView;
-   var rt=N("Retinoscope");if(rt&&rt.parent==view.transform){rt.localPosition=Vector3.Lerp(rt.localPosition,new Vector3(.125f,-.15f,.31f)+new Vector3(dir.x,dir.y,0)*sweep*.012f,Time.deltaTime*12);rt.localRotation=Quaternion.Slerp(rt.localRotation,Quaternion.Euler(-sweep*4*dir.y,sweep*4*dir.x,90-session.streak),Time.deltaTime*12);}
+   // the scope is held up in view: it shifts and tilts with the sweep so you can see where the beam is going
+   var rt=N("Retinoscope");if(rt&&rt.parent==view.transform){Vector3 swp=new Vector3(dir.x,dir.y,0)*sweep;rt.localPosition=Vector3.Lerp(rt.localPosition,new Vector3(.105f,-.165f,.29f)+swp*.03f,Time.deltaTime*14);rt.localRotation=Quaternion.Slerp(rt.localRotation,Quaternion.Euler(-swp.y*14,180+swp.x*14,4),Time.deltaTime*14);}
   }
 
   // ---------------- session flow ----------------
   public void Begin(string mode){
-   ReturnTools();held=0;session=new ClinicSession();session.patient=ui.selectedPatient;session.mode=mode;session.EnterStage();begun=true;paused=false;notebook=false;focused=false;patientView=false;pdStep=-1;cinematic=false;handScripted=false;
-   walkPos=new Vector3(.6f,1.65f,.3f);view.transform.position=walkPos;yaw=0;pitch=0;view.transform.rotation=Quaternion.identity;targetFov=66;hands.gameObject.SetActive(true);ui.menu.SetActive(false);
-   ApplyPatient();SyncMechanics(true);DrawChart();Lock();Say("您好，我看遠有點模糊，今天想檢查度數。",true);SaveProgress();}
+   string mark="tools";
+   try{
+    ReturnTools();held=0;mark="session";session=new ClinicSession();session.patient=ui.selectedPatient;session.mode=mode;session.wdCm=PlayerPrefs.GetFloat("ClinicWD",57);session.EnterStage();begun=true;paused=false;notebook=false;focused=false;patientView=false;pdStep=-1;cinematic=false;handScripted=false;
+    mark="camera";walkPos=new Vector3(.6f,1.65f,.3f);view.transform.position=walkPos;yaw=0;pitch=0;view.transform.rotation=Quaternion.identity;targetFov=66;hands.gameObject.SetActive(true);ui.menu.SetActive(false);
+    mark="patient";ApplyPatient();mark="mechanics";SyncMechanics(true);mark="chart";DrawChart();mark="lock";Lock();mark="say";Say("您好，我看遠有點模糊，今天想檢查度數。",true);mark="save";SaveProgress();
+   }catch(Exception ex){Debug.LogError("CLINIC_BEGIN_FAILED at "+mark+": "+ex);begun=true;ui.menu.SetActive(false);hands.gameObject.SetActive(true);}
+  }
   public void Resume(){if(!PlayerPrefs.HasKey("ClinicSession"))return;session=JsonUtility.FromJson<ClinicSession>(PlayerPrefs.GetString("ClinicSession"));if(session.stage>0)session.phoropterIn=true;begun=true;pdStep=-1;cinematic=false;walkPos=new Vector3(.6f,1.65f,.3f);view.transform.position=walkPos;view.transform.rotation=Quaternion.identity;yaw=0;pitch=0;targetFov=66;hands.gameObject.SetActive(true);ui.menu.SetActive(false);ApplyPatient();SyncMechanics(true);DrawChart();Lock();Toast("已恢復病例與教學進度。");}
   void LoadProgress(){ui.canResume=PlayerPrefs.HasKey("ClinicSession");}
   public void SaveProgress(){if(begun){PlayerPrefs.SetString("ClinicSession",JsonUtility.ToJson(session));PlayerPrefs.Save();if(ui)ui.canResume=true;}}
@@ -511,7 +525,9 @@ namespace RefractionRoom {
   public void Fog(){if(busy)return;float amount=session.Phase==5?.5f:1;var e=session.eye;StartCoroutine(Action("knob:Sph_"+EN[e],()=>{Rx r=session.H.lens;r.s+=amount;session.H.lens=r;if(session.Phase==5)session.H.secondFogged=true;else session.H.fogged=true;session.H.highestFog=amount;session.Log("霧視 +"+amount.ToString("0.00")+"D");SyncMechanics();DrawChart();Toast("加 +"+amount.ToString("0.00")+" D 霧視；逐格退正並反覆確認視力。");SaveProgress();}));}
   public void CycleJCC(){if(busy)return;SetJCC((session.jccMode+1)%3);}
   void SetJCC(int mode){if(!session.phoropterIn){Toast("先把驗光儀轉到受測者眼前。");return;}StartCoroutine(Action("jcc-swing",()=>{session.jccMode=mode;SyncMechanics();Toast(new[]{"轉盤收回 JCC","JCC 轉入 · 軸位 A：滾輪手柄與柱面軸同向，紅白點在兩側 45°","JCC 轉 45° · 度數 P：紅點與柱面軸平行"}[mode]);}));}
-  public void Streak(int sign){session.streak=Optics.Axis(session.streak+sign*15);if(session.streak>=180)session.streak=0;session.Log("光帶旋轉 "+session.streak);audioOut.PlayOneShot(tick,.6f);}
+  public void Streak(int sign){Reach(N("RetSleeve"));session.streak=Optics.Axis(session.streak+sign*15);if(session.streak>=180)session.streak=0;session.Log("光帶旋轉 "+session.streak);audioOut.PlayOneShot(tick,.6f);}
+  public void Streak90(){Reach(N("RetSleeve"));session.streak=Optics.Axis(session.streak+90);if(session.streak>=180)session.streak=0;session.Log("光帶轉 90° → "+session.streak);audioOut.PlayOneShot(click,.5f);Toast("撥動套筒滾輪：光帶轉到 "+StreakName()+"，掃另一條主子午線。");}
+  public string StreakName(){float a=session.streak%180;return a+"°"+(a==0?"（水平）":a==90?"（垂直）":"");}
   public void Sweep(){if(busy)return;if(held!=1){Toast("請先拿起檢影鏡。");return;}StartCoroutine(SweepRoutine());}
   IEnumerator SweepRoutine(){
    busy=true;animationLog.Add("retino-sweep");
@@ -520,7 +536,15 @@ namespace RefractionRoom {
    if(session.mode!="考試")Say(Mathf.Abs(r)<.125f?"（光帶中和：瞳孔整片亮起，看不出移動）":r<0?"（反射光與光帶同向移動：順動）":"（反射光與光帶反向移動：逆動）",false);
    busy=false;
   }
-  public void WorkingDistance(){if(busy)return;session.wdCm=session.wdCm<60?67:session.wdCm<80?100:50;if(focused&&held==1)GoTo(FocusPoint(),Quaternion.identity);Toast("工作距離 "+session.wdCm+" cm / "+Optics.WD(session.wdCm).ToString("0.00")+" D");}
+  public static readonly float[] WDOptions={40,50,57,60,67,75,80,100};
+  public void ShiftWD(int dir){
+   if(busy)return;if(session.wdRemoved){Toast("已從兩眼扣除工作距離，不能再改；要換工作距離請重新開始病例。");return;}
+   int k=0;float best=999;for(int i=0;i<WDOptions.Length;i++){float d=Mathf.Abs(WDOptions[i]-session.wdCm);if(d<best){best=d;k=i;}}
+   k=Mathf.Clamp(k+dir,0,WDOptions.Length-1);session.wdCm=WDOptions[k];PlayerPrefs.SetFloat("ClinicWD",session.wdCm);
+   if(focused&&held==1)GoTo(FocusPoint(),Quaternion.identity);audioOut.PlayOneShot(tick,.5f);
+   Toast("工作距離 "+session.wdCm+" cm ＝ "+Optics.WD(session.wdCm).ToString("0.00")+" D（檢影後從兩眼球面扣除）");MarkSave();
+  }
+  public void WorkingDistance(){ShiftWD(1);}
   public void RemoveWD(){if(busy)return;if(session.wdRemoved){Toast("已扣除工作距離，避免重複扣除。");return;}StartCoroutine(Action("knob:Sph_OD",()=>{float wd=Optics.WD(session.wdCm);foreach(var h in session.eyes){Rx r=h.lens;r.s-=wd;h.lens=r;}session.wdRemoved=true;session.Log("雙眼扣 WD "+wd);SyncMechanics();Toast("雙眼球面各扣 "+wd.ToString("0.00")+"D；柱面與軸不變。");}));}
   public void Ask(){
    if(busy||!focused)return;
@@ -528,7 +552,8 @@ namespace RefractionRoom {
    if(session.stage==1||session.stage==2){Sweep();return;}
    if(session.chart==1){StartCoroutine(Action("ask",()=>{session.H.duoAsked=true;Say(Optics.Duo(session.Truth(session.eye),session.H.lens),true);session.Log("紅綠問答");}));return;}
    if(session.jccMode>0){StartCoroutine(CompareJCC());return;}
-   StartCoroutine(Action("ask",()=>{session.Read();float best=Optics.BestRow(session.Truth(session.eye),session.H.lens,session.ph);string[] dirs={"上","右","下","左","上"};string s="";for(int i=0;i<5;i++)s+=(session.row<=best+.025f?dirs[i]:i<2?dirs[i]:"看不清楚")+(i<4?"、":"。");Say("這一排："+s+(session.row>best+.025f?"字有點糊。":""),true);SaveProgress();}));
+   StartCoroutine(Action("ask",()=>{session.Read();int n=session.H.lastLetters;string[] dirs={"上","右","下","左","上"};string s="";for(int i=0;i<5;i++)s+=(i<n?dirs[i]:"看不清楚")+(i<4?"、":"。");Say("這一排："+s+(n<5?"後面有點糊。":""),true);
+    float bv,lm;string lab=Optics.VALabel(session.row,n,out bv,out lm);if(session.mode!="考試")Toast("列 "+session.row.ToString("0.0")+" 讀對 "+n+"/5"+(lab!=""?" → 記為 "+lab:" → 這列讀不到，換大一列")+"（3–4 個記「該列 −錯幾個」，1–2 個記「上一列 +讀對幾個」）");SaveProgress();}));
   }
   IEnumerator CompareJCC(){
    busy=true;animationLog.Add("jcc-compare");string en=EN[session.eye];Transform flip=N("JCCFlip_"+en);Reach(N("JCCCell_"+en));
@@ -677,7 +702,6 @@ namespace RefractionRoom {
    if(Input.GetKeyDown(KeyCode.Space))PDInstruct();
    if(Input.GetKeyDown(KeyCode.Q))PDClose(1);
    if(Input.GetKeyDown(KeyCode.E))PDClose(2);
-   if(Input.GetKeyDown(KeyCode.W))PDClose(0);
    int s=Input.GetKeyDown(KeyCode.RightArrow)?1:Input.GetKeyDown(KeyCode.LeftArrow)?-1:0;float sc=Input.mouseScrollDelta.y;if(Mathf.Abs(sc)>.1f)s=sc>0?1:-1;
    if(s!=0)PDNudge(s);
    if(Input.GetKeyDown(KeyCode.Return)||Input.GetKeyDown(KeyCode.KeypadEnter))PDConfirm();
@@ -729,11 +753,13 @@ namespace RefractionRoom {
   // ---------------- chart ----------------
   void DrawChart(){if(!chartTex)return;int w=chartTex.width,h=chartTex.height;Color32[] pix=new Color32[w*h];Color32 bg=new Color32(244,243,228,255),ink=new Color32(16,24,23,255);
    for(int yy=0;yy<h;yy++)for(int x=0;x<w;x++)pix[yy*w+x]=session.chart==1?(x<w/2?new Color32(196,39,35,255):new Color32(44,158,74,255)):bg;
+   ChartZoom=1;
    if(session.chart==2){for(int y=190;y<590;y+=54)for(int x=290;x<760;x+=54)Disc(pix,w,h,x,y,7,ink);}
    else{
     // E height subtends five arcminutes / decimal VA at 6m; each stroke one fifth.
     float eh=(2*6*Mathf.Tan(2.5f*Mathf.Deg2Rad/60)/Mathf.Max(.1f,session.row))/1.08f*w;
     float scale=eh/5;int count=5;float gap=eh*2;float start=(w-(count-1)*gap-eh)/2;
+    ChartZoom=Mathf.Clamp(eh*13/w,.06f,1);
     for(int k=0;k<count;k++)E(pix,w,h,start+k*gap,h/2-eh/2,scale,new int[]{1,0,3,2,1}[k],ink);
    }
    if(patientView){float b=Optics.Blur(session.Truth(session.eye),session.H.lens,session.ph);int radius=Mathf.Clamp(Mathf.RoundToInt(b*3),0,12);if(radius>0)pix=BlurTexture(pix,w,h,radius);}
@@ -745,10 +771,10 @@ namespace RefractionRoom {
   AudioClip Tone(float hz,float secs,float amp){int samples=(int)(22050*secs);float[] d=new float[samples];for(int i=0;i<samples;i++)d[i]=Mathf.Sin(i*hz*2*Mathf.PI/22050)*Mathf.Exp(-i/(samples*.22f))*amp;var clip=AudioClip.Create("clinic click",samples,1,22050,false);clip.SetData(d,0);return clip;}
   AudioClip Noise(float secs,float amp){int samples=(int)(22050*secs);float[] d=new float[samples];var rng=new System.Random(7);float lp=0;for(int i=0;i<samples;i++){float n=(float)rng.NextDouble()*2-1;lp=lp*.55f+n*.45f;float env=Mathf.Min(1,i/600f)*Mathf.Exp(-i/(samples*.45f));d[i]=(n-lp)*env*amp;}var clip=AudioClip.Create("spray",samples,1,22050,false);clip.SetData(d,0);return clip;}
   public void Export(){string text="視光學實驗（二）期中考練習紀錄\n工作距離 "+session.wdCm+"cm / 受測者 "+session.PatientName+"（病例 "+session.patient+"）/ PD "+session.pd+"mm / 模式 "+session.mode+"\n";string[] eyeN={"OD","OS"};
-   text+="① Retinoscopy\n";for(int e=0;e<2;e++)text+=eyeN[e]+": "+session.eyes[e].net+"  VA: "+session.eyes[e].measuredVA.ToString("0.0")+"\n";
-   text+="② 1st MPMVA\n";for(int e=0;e<2;e++)text+=eyeN[e]+": "+session.eyes[e].mp1+"  VA: "+session.eyes[e].mp1VA.ToString("0.0")+"\n";
+   text+="① Retinoscopy\n";for(int e=0;e<2;e++)text+=eyeN[e]+": "+session.eyes[e].net+"  VA: "+session.eyes[e].vaText+(session.eyes[e].phRead?" (PH "+session.eyes[e].phVAText+")":"")+"\n";
+   text+="② 1st MPMVA\n";for(int e=0;e<2;e++)text+=eyeN[e]+": "+session.eyes[e].mp1+"  VA: "+session.eyes[e].mp1VAText+"\n";
    text+="③ JCC\n";for(int e=0;e<2;e++)text+=eyeN[e]+": "+session.eyes[e].jccResult+"\n";
-   text+="④ 2nd MPMVA\n";for(int e=0;e<2;e++)text+=eyeN[e]+": "+session.eyes[e].final+"  VA: "+session.eyes[e].finalVA.ToString("0.0")+"\n";
+   text+="④ 2nd MPMVA\n";for(int e=0;e<2;e++)text+=eyeN[e]+": "+session.eyes[e].final+"  VA: "+session.eyes[e].finalVAText+"\n";
    text+="\n練習模型，非臨床處方。\n\n操作紀錄\n"+string.Join("\n",session.events);
    #if UNITY_WEBGL && !UNITY_EDITOR
    ClinicDownload("視光室-病例"+session.patient+".txt",text);
@@ -758,8 +784,9 @@ namespace RefractionRoom {
   }
   public void QATimeScale(string s){if(Application.absoluteURL.Contains("qa=1")||Application.isEditor)Time.timeScale=Mathf.Clamp(float.Parse(s,System.Globalization.CultureInfo.InvariantCulture),.05f,4);}
   public void RunQA(){var qa=GetComponent<ClinicQA>();if(!qa)qa=gameObject.AddComponent<ClinicQA>();qa.Run();}
-  public string Evidence(){return JsonUtility.ToJson(new EvidenceData{stage=session.stage,eye=session.eye,mode=session.mode,begun=begun,focused=focused,busy=busy,missing=session.Missing().Count,animationCount=animationLog.Count,x=view.transform.position.x,z=view.transform.position.z,rx=session.H.lens.ToString(),action=lastAction,completed=session.completed,pd=session.pd,pdStep=pdStep,phoropterIn=session.phoropterIn,mouseDowns=mouseDowns,uiHit=uiHit});}
-  [Serializable] public class EvidenceData{public int stage,eye,missing,animationCount,pdStep,mouseDowns;public string mode,rx,action,uiHit;public bool begun,focused,busy,completed,phoropterIn;public float x,z,pd;}
+  public string Evidence(){return JsonUtility.ToJson(new EvidenceData{stage=session.stage,eye=session.eye,mode=session.mode,begun=begun,focused=focused,busy=busy,missing=session.Missing().Count,animationCount=animationLog.Count,x=view.transform.position.x,z=view.transform.position.z,rx=session.H.lens.ToString(),action=lastAction,completed=session.completed,pd=session.pd,pdStep=pdStep,phoropterIn=session.phoropterIn,mouseDowns=mouseDowns,uiHit=uiHit,examinerEye=examinerEye,odYaw=EyeYaw(0),osYaw=EyeYaw(1)});
+  float EyeYaw(int e){var t=N("Eye_"+EN[e]);if(!t)return 0;Vector3 f=t.rotation*Vector3.back;return Mathf.Atan2(f.x,-f.z)*Mathf.Rad2Deg;}}
+  [Serializable] public class EvidenceData{public int stage,eye,missing,animationCount,pdStep,mouseDowns,examinerEye;public float odYaw,osYaw;public string mode,rx,action,uiHit;public bool begun,focused,busy,completed,phoropterIn;public float x,z,pd;}
   void Emit(){
    #if UNITY_WEBGL && !UNITY_EDITOR
    ClinicTelemetry(Evidence());
