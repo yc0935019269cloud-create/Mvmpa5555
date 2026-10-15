@@ -1,0 +1,67 @@
+[
+  {
+    "asset": "Architecture",
+    "objects": 296,
+    "source": "RefractionRoom.blend"
+  },
+  {
+    "asset": "CleaningCloth",
+    "objects": 10,
+    "source": "RefractionRoom.blend"
+  },
+  {
+    "asset": "ClinicianHands",
+    "objects": 35,
+    "source": "RefractionRoom.blend"
+  },
+  {
+    "asset": "Clipboard",
+    "objects": 11,
+    "source": "RefractionRoom.blend"
+  },
+  {
+    "asset": "ExamChair",
+    "objects": 10,
+    "source": "RefractionRoom.blend"
+  },
+  {
+    "asset": "LightSwitch",
+    "objects": 4,
+    "source": "RefractionRoom.blend"
+  },
+  {
+    "asset": "Patient",
+    "objects": 87,
+    "source": "RefractionRoom.blend"
+  },
+  {
+    "asset": "PDRuler",
+    "objects": 38,
+    "source": "RefractionRoom.blend"
+  },
+  {
+    "asset": "Pen",
+    "objects": 3,
+    "source": "RefractionRoom.blend"
+  },
+  {
+    "asset": "Phoropter",
+    "objects": 160,
+    "source": "RefractionRoom.blend"
+  },
+  {
+    "asset": "Remote",
+    "objects": 10,
+    "source": "RefractionRoom.blend"
+  },
+  {
+    "asset": "Retinoscope",
+    "objects": 11,
+    "source": "RefractionRoom.blend"
+  },
+  {
+    "asset": "Sanitizer",
+    "objects": 4,
+    "source": "RefractionRoom.blend"
+  }
+]

@@ -1,0 +1,4 @@
+Result: Succeeded
+Size: 7479865
+Time: 00:00:04.5784915
+Errors: 0

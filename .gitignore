@@ -1,3 +1,17 @@
 node_modules/
 .DS_Store
 *.log
+UnityProject/Library/
+UnityProject/Temp/
+UnityProject/Obj/
+UnityProject/Logs/
+UnityProject/UserSettings/
+UnityProject/.vs/
+UnityProject/.vscode/
+UnityProject/*.csproj
+UnityProject/*.sln*
+*.blend1
+__pycache__/
+Reports/*.traceevents
+Reports/*.dag*
+_site/
