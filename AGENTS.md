@@ -10,3 +10,5 @@
 - 使用者明確限定只有期中範圍，不包含鐘面圖。散光只做 JCC；不得加入雙眼平衡、AA、NPA、NPC。
 - 改動光學／任務必須跑 ClinicBuild.Validate；發布必須實際 WebGL build 與瀏覽器驗證。
 - 不提交 Library/Temp/Logs/UserSettings、金鑰、其他專案資產。
+
+- 遙控器已移到左下角常駐 UI；主觀驗光不要重新塞回所有調鏡按鈕。工具集中於 LiftDeck 升降桌。JCC 中央點 A/P、滾輪翻面、外支桿拖曳。細節見 README 與 SESSION_NOTES。

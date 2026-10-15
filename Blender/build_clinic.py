@@ -257,11 +257,6 @@ for z in [3.4,4.2,5.0]:
     for y in [.19,.49,.77]:
         box('Drawer',(-2.045,y,z),(.025,.25,.72),'Porcelain',.01)
         link('DrawerPull',(-2.015,y,z-.15),(-2.015,y,z+.15),.012,'Brass')
-# instrument tray for the hygiene and measuring tools
-box('ToolTray',(-2.58,.982,3.95),(.34,.012,.62),'Graphite',.006)
-box('DeskTop',(2.7,.85,1.7),(1.6,.07,2.0),'OakLight')
-for x in [2.08,3.32]:
-    for z in [.87,2.53]:box('DeskLeg',(x,.42,z),(.06,.84,.06),'Graphite')
 cyl('StoolSeat',(.8,.58,2.8),.23,.085,'Teal');cyl('StoolStem',(.8,.31,2.8),.033,.5,'Chrome')
 for a in range(5):
     an=a*math.tau/5;end=(.8+math.cos(an)*.3,.1,2.8+math.sin(an)*.3)
@@ -276,11 +271,6 @@ box('ChartSurface',(0,1.5,-1.482),(1.08,.82,.012),'White',0)
 box('ChartStand',(0,.49,-1.56),(.05,.98,.05),'Chrome')
 box('ChartFoot',(0,.05,-1.56),(.65,.05,.38),'Graphite')
 box('Projector',(-2.75,2.83,-.9),(.4,.13,.3),'Porcelain');cyl('ProjectorLens',(-2.75,2.83,-1.06),.045,.03,'Lens','Z')
-box('MonitorBody',(2.5,1.22,1.9),(.78,.48,.055),'Graphite')
-box('MonitorScreen',(2.5,1.22,1.86),(.70,.4,.012),'White',0)
-box('MonitorStem',(2.5,1.0,1.92),(.05,.24,.05),'Chrome')
-box('MonitorFoot',(2.5,.9,1.92),(.35,.025,.2),'Graphite')
-
 # ================= Exam chair =================
 def rrect(cx,cy,w,h,r,n=6):
     pts=[]
@@ -460,9 +450,17 @@ for s in (-1,1):
 
 # ================= Refraction stand =================
 group=root('PhoropterStand',(.62,0,4.425))
-cyl('StandBase',(.62,.03,4.425),.24,.06,'StandWhite',vertices=64)
-cyl('StandBaseTrim',(.62,.065,4.425),.17,.012,'Graphite',vertices=64)
-cyl('StandColumn',(.62,1.05,4.425),.042,1.95,'StandWhite',vertices=48)
+box('LiftFoot',(1.08,.055,4.25),(.85,.10,.66),'Graphite',.045)
+box('LiftPedestal',(1.08,.43,4.25),(.24,.75,.22),'StandWhite',.025)
+box('LiftInnerColumn',(1.08,.72,4.25),(.18,.40,.16),'Chrome',.015)
+deck=pivot('LiftDeck',(1.08,.92,4.25),group)
+box('LiftTableTop',(1.08,.91,4.25),(1.06,.055,.88),'StandWhite',.035,deck)
+box('LiftTableRim',(1.08,.881,4.25),(1.00,.025,.83),'Graphite',.025,deck)
+box('MonitorBody',(1.16,1.14,4.59),(.46,.32,.045),'Graphite',.012,deck)
+box('MonitorScreen',(1.16,1.14,4.562),(.42,.27,.009),'White',0,deck)
+box('MonitorStem',(1.16,.99,4.60),(.035,.14,.035),'Chrome',.004,deck)
+box('MonitorFoot',(1.16,.95,4.60),(.25,.018,.12),'Graphite',.008,deck)
+cyl('StandColumn',(.62,1.48,4.425),.042,1.10,'StandWhite',vertices=48)
 cyl('StandCap',(.62,2.04,4.425),.05,.04,'Graphite',vertices=48)
 link('LampArm',(.62,2.03,4.425),(.33,2.0,4.32),.016,'StandWhite')
 lamp=pivot('StandLamp',(.30,1.98,4.31),group)
@@ -645,9 +643,13 @@ for i in range(N):
     for j in range(N):a=i*(N+1)+j;cf.append((a,a+N+1,a+N+2,a+1))
 o=new_mesh('FoldedCloth',cv,cf,'Cuff',None,outward=('dir',(0,1,0)))
 mod=o.modifiers.new('Thick','SOLIDIFY');mod.thickness=.004;apply_mod(o,mod)
-group=root('Remote',(0,0,0));box('RemoteBody',(0,0,0),(.047,.13,.018),'Graphite',.012)
-for y in [.043,.02,-.003,-.026]:
-    for x in [-.012,.012]:ell('RemoteButton',(x,y,-.009),(.006,.006,.003),'White')
+group=root('Remote',(0,0,0))
+box('RemoteBody',(0,0,0),(.055,.185,.018),'Porcelain',.009)
+box('RemoteFace',(0,.006,-.010),(.045,.151,.003),'Graphite',.002)
+for row in range(9):
+    for col in range(3):
+        box('RemoteKey',(-.014+col*.014,.061-row*.014,-.013),(.010,.009,.004),'Red' if row==8 and col==1 else 'White',.001)
+
 group=root('Clipboard',(0,0,0));box('Board',(0,0,0),(.24,.33,.012),'Oak',.006)
 box('RecordSheet',(0,0,-.008),(.22,.30,.001),'Paper',0)
 box('Clip',(0,.155,-.015),(.09,.03,.015),'Chrome',.004)

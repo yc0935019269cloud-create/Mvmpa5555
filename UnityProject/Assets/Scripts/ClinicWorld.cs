@@ -16,10 +16,38 @@ namespace RefractionRoom {
   public bool begun,focused,busy,notebook,patientView,paused,cinematic,touchMode;
   public string touchSel="";
   public int parameter=0,held=0;
+  public bool remoteOwned,projectorOn=true;
+  int jccDrag=-1; float dragStartAngle,dragStartRotation; bool[] jccFace=new bool[2];
+  float PointerAngle(Transform t){Vector3 q=view.WorldToScreenPoint(t.position);return Mathf.Atan2(Input.mousePosition.y-q.y,Input.mousePosition.x-q.x)*Mathf.Rad2Deg;}
+  void DragJCC(){if(jccDrag<0)return;var t=N("Turret_"+EN[jccDrag]);if(paused||notebook||!focused||busy){jccDrag=-1;SyncMechanics();return;}
+   float a=dragStartRotation+Mathf.DeltaAngle(dragStartAngle,PointerAngle(t));Spin(t.name,Quaternion.Euler(0,0,a),false,35);
+   if(Input.GetMouseButtonUp(0)){int e=jccDrag;jccDrag=-1;float target=TurretInAngle(e);session.jccMode=Mathf.Abs(Mathf.DeltaAngle(a,target))<Mathf.Abs(Mathf.DeltaAngle(a,0))?Mathf.Max(1,session.jccMode):0;SyncMechanics();MarkSave();}}
+  public void RemoteRow(float row){if(busy)return;projectorOn=true;session.row=row;DrawChart();MarkSave();}
+  public void RemoteReset(){if(busy)return;projectorOn=true;session.chart=0;session.row=.6f;DrawChart();MarkSave();}
+  public void RemotePower(){if(busy)return;projectorOn=!projectorOn;DrawChart();}
+
   public string speech="您好，我最近看遠的時候有點模糊。",lastAction="歡迎來到視光室。",focusLabel="",hoverLabel="";
   public float speechUntil=0;
   public RenderTexture scopeTexture;
   public AudioSource audioOut;
+  public float musicVolume=.2f; AudioSource musicSource; float pauseScale=1;
+  [DllImport("__Internal")] static extern void ClinicMusicVolume(float volume);
+  public void SetMusicVolume(float value){musicVolume=Mathf.Clamp01(value);PlayerPrefs.SetFloat("ClinicMusicVolume",musicVolume);PlayerPrefs.Save();if(musicSource)musicSource.volume=musicVolume;
+   #if UNITY_WEBGL && !UNITY_EDITOR
+   ClinicMusicVolume(musicVolume);
+   #endif
+  }
+  IEnumerator LoadMusic(){
+   using(var req=UnityEngine.Networking.UnityWebRequestMultimedia.GetAudioClip(new Uri(System.IO.Path.Combine(Application.streamingAssetsPath,"Audio/blue-oiia-uiia-cat.mp3")).AbsoluteUri,AudioType.MPEG)){
+    yield return req.SendWebRequest();if(req.result==UnityEngine.Networking.UnityWebRequest.Result.Success){musicSource=gameObject.AddComponent<AudioSource>();musicSource.clip=UnityEngine.Networking.DownloadHandlerAudioClip.GetContent(req);musicSource.loop=true;musicSource.spatialBlend=0;musicSource.volume=musicVolume;musicSource.Play();}else Debug.LogWarning("Music: "+req.error);
+   }
+  }
+  public void TogglePause(){if(!begun)return;paused=!paused;if(paused){pauseScale=Time.timeScale;Time.timeScale=0;Release();}else{Time.timeScale=pauseScale>0?pauseScale:1;if(!focused&&!notebook)Lock();}if(ui)ui.Refresh();}
+  public void ReturnToMenu(bool abandon){Time.timeScale=1;StopAllCoroutines();var qa=GetComponent<ClinicQA>();if(qa)qa.StopAllCoroutines();busy=false;saveDirty=false;handScripted=false;cinematic=false;jccDrag=-1;pdStep=-1;examinerEye=0;tweening=false;ReturnTools();held=0;
+   if(abandon){PlayerPrefs.DeleteKey("ClinicSession");PlayerPrefs.DeleteKey("ClinicRemote");PlayerPrefs.Save();ui.canResume=false;remoteOwned=false;}else SaveProgress();
+   begun=false;paused=false;notebook=false;focused=false;patientView=false;if(mist)mist.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);if(sheen)sheen.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);if(streakLight)streakLight.enabled=false;if(streakStrip)streakStrip.gameObject.SetActive(false);foreach(string n in new[]{"PupilReflex_0","PupilReflex_1"})if(N(n))N(n).gameObject.SetActive(false);
+   Release();ui.menu.SetActive(true);ui.Refresh();}
+
   public List<string> animationLog=new List<string>();
   // PD measurement (Viktorin): pdStep 0 instruct, 1 close own right eye, 2 align zero, 3 close own left eye, 4 read, -1 off
   public int pdStep=-1,examinerEye=0;
@@ -70,15 +98,16 @@ namespace RefractionRoom {
   void Start(){
    // The refractor hangs from the stand arm: swinging the arm carries the whole head.
    var arm=Deep(models,"ArmSwing");var head=Deep(models,"Phoropter");if(arm&&head)head.SetParent(arm,true);
+   var deck=Deep(models,"LiftDeck");if(deck){foreach(string n in new[]{"ArmSwing","StandColumn","StandCap","LampArm","StandLamp"}){var t=Deep(models,n);if(t)t.SetParent(deck,true);}}
    Register(models);Register(hands);
    foreach(string n in new[]{"Retinoscope","PDRuler","CleaningCloth","Remote","Clipboard","Pen","Sanitizer"}){var t=N(n);if(t)tools[n]=t.gameObject;}
-   SetupTool("Retinoscope",new Vector3(-2.63f,1.012f,3.52f),new Vector3(0,0,90));
-   SetupTool("PDRuler",new Vector3(-2.58f,.9905f,3.80f),new Vector3(90,0,0));
-   SetupTool("CleaningCloth",new Vector3(-2.56f,.990f,4.10f),new Vector3(0,30,0));
-   SetupTool("Sanitizer",new Vector3(-2.64f,1.047f,4.42f),Vector3.zero);
-   SetupTool("Remote",new Vector3(2.3f,.894f,1.1f),new Vector3(90,0,0));
-   SetupTool("Clipboard",new Vector3(2.65f,.892f,1.18f),new Vector3(90,0,0));
-   SetupTool("Pen",new Vector3(2.87f,.894f,1.12f),new Vector3(0,15,90));
+   SetupTool("Retinoscope",new Vector3(1.04f,.962f,3.96f),new Vector3(0,0,90));
+   SetupTool("PDRuler",new Vector3(1.27f,.9405f,3.94f),new Vector3(90,0,0));
+   SetupTool("CleaningCloth",new Vector3(1.46f,.94f,4.18f),new Vector3(0,30,0));
+   SetupTool("Sanitizer",new Vector3(1.47f,.997f,4.43f),Vector3.zero);
+   SetupTool("Remote",new Vector3(.76f,.944f,3.96f),new Vector3(90,0,0));
+   SetupTool("Clipboard",new Vector3(1.13f,.942f,4.25f),new Vector3(90,0,0));
+   SetupTool("Pen",new Vector3(1.36f,.944f,4.25f),new Vector3(0,15,90));
    foreach(var l in FindObjectsByType<Light>(FindObjectsSortMode.None))lamps.Add(l);
    post=view.GetComponent<ClinicPost>();
    block=new MaterialPropertyBlock();
@@ -86,13 +115,14 @@ namespace RefractionRoom {
    Font.textureRebuilt+=f=>{if(f==font&&textMat)textMat.mainTexture=font.material.mainTexture;};
    MakeTarget("patient","與受測者說話",new Vector3(0,1.44f,4.56f),new Vector3(.32f,.35f,.2f));
    MakeTarget("phoropter","坐近綜合驗光儀",new Vector3(0,1.42f,4.40f),new Vector3(.5f,.42f,.14f));
-   MakeTarget("sanitize","拿取清潔棉布（消毒）",new Vector3(-2.56f,1.03f,4.12f),new Vector3(.24f,.14f,.24f));
-   MakeTarget("pd","拿取 PD 尺",new Vector3(-2.58f,1.03f,3.80f),new Vector3(.28f,.14f,.24f));
-   MakeTarget("retino","拿取檢影鏡",new Vector3(-2.63f,1.05f,3.5f),new Vector3(.23f,.2f,.23f));
-   MakeTarget("remote","拿取視標遙控器",new Vector3(2.3f,.95f,1.1f),new Vector3(.23f,.18f,.22f));
-   MakeTarget("paper","查看板夾紀錄",new Vector3(2.65f,.95f,1.18f),new Vector3(.29f,.17f,.35f));
+   MakeTarget("sanitize","拿取清潔棉布（消毒）",new Vector3(1.46f,.98f,4.18f),new Vector3(.24f,.14f,.24f));
+   MakeTarget("pd","拿取 PD 尺",new Vector3(1.27f,.98f,3.94f),new Vector3(.28f,.14f,.24f));
+   MakeTarget("retino","拿取檢影鏡",new Vector3(1.04f,.99f,3.96f),new Vector3(.23f,.2f,.23f));
+   MakeTarget("remote","拿取視標遙控器",new Vector3(.76f,.99f,3.96f),new Vector3(.23f,.18f,.22f));
+   MakeTarget("paper","查看板夾紀錄",new Vector3(1.13f,.99f,4.25f),new Vector3(.29f,.17f,.35f));
    MakeTarget("light","調整診間燈光",new Vector3(3.7f,1.28f,3.2f),new Vector3(.18f,.2f,.2f));
    MakeTarget("chart","查看 6 公尺視標",new Vector3(0,1.5f,-1.45f),new Vector3(1.1f,.85f,.1f));
+   if(deck)foreach(var t in FindObjectsByType<ClinicTarget>(FindObjectsSortMode.None)){if(t.id=="remote"||t.id=="retino"||t.id=="pd"||t.id=="sanitize"||t.id=="paper")t.transform.SetParent(deck,true);}
    BuildControls();
    // The inspection eyepiece renders the modelled pupil; there is no answer graphic.
    scopeTexture=new RenderTexture(512,512,16,RenderTextureFormat.ARGB32);scopeTexture.Create();
@@ -108,9 +138,13 @@ namespace RefractionRoom {
    foreach(string chartPart in new[]{"ChartFrame","ChartSurface","ChartStand","ChartFoot"})if(N(chartPart))N(chartPart).position+=new Vector3(0,0,-.06f);
    chartMat=new Material(Shader.Find("Clinic/Screen"));chartMat.mainTexture=chartTex;
    var surf=DisplayQuad("Calibrated chart display");surf.transform.position=new Vector3(0,1.5f,-1.525f);surf.transform.rotation=Quaternion.Euler(0,180,0);surf.transform.localScale=new Vector3(1.08f,.81f,1);surf.GetComponent<Renderer>().sharedMaterial=chartMat;
-   var mon=DisplayQuad("Chart monitor repeat");mon.transform.position=new Vector3(2.5f,1.22f,1.85f);mon.transform.localScale=new Vector3(.70f,.4f,1);mon.GetComponent<Renderer>().sharedMaterial=chartMat;
+   var mon=DisplayQuad("Chart monitor repeat");mon.transform.position=new Vector3(1.16f,1.14f,4.555f);mon.transform.localScale=new Vector3(.42f,.27f,1);mon.GetComponent<Renderer>().sharedMaterial=chartMat;if(deck)mon.transform.SetParent(deck,true);
    BuildSigns();BuildScales();
    audioOut=gameObject.AddComponent<AudioSource>();audioOut.spatialBlend=0;tick=Tone(1250,.022f,.11f);click=Tone(520,.05f,.16f);footstep=Tone(92,.065f,.10f);spray=Noise(.32f,.12f);
+   SetMusicVolume(PlayerPrefs.GetFloat("ClinicMusicVolume",.2f));
+   #if !UNITY_WEBGL || UNITY_EDITOR
+   StartCoroutine(LoadMusic());
+   #endif
    view.transform.position=walkPos;view.transform.rotation=Quaternion.Euler(0,0,0);view.fieldOfView=targetFov=66;
    hands.gameObject.SetActive(false);
    touchMode=Application.isMobilePlatform||Application.absoluteURL.Contains("touch=1");
@@ -142,7 +176,7 @@ namespace RefractionRoom {
     var aux=N("Aux_"+en);Control("aux:"+e,side+" 輔助鏡片旋鈕",pod,aux.position+new Vector3(0,0,-.002f),.012f,aux);
     var ax=N("AxisKnob_"+en);Control("axis:"+e,side+" 柱面軸鈕（外圈，每格 5°）",pod,ax.position,.019f,ax);
     var cy=N("Cyl_"+en);Control("cyl:"+e,side+" 柱面度數鈕（內鈕，每格 0.25DC）",pod,cy.position,.012f,cy);
-    var cell=N("JCCCell_"+en);if(cell){Control("jcc:"+e,side+" JCC 交叉圓柱鏡",cell,cell.position+new Vector3(0,0,-.002f),.0155f,N("Turret_"+en));
+    var cell=N("JCCCell_"+en);if(cell){var tur=N("Turret_"+en);for(int k=1;k<=3;k++)Control("jccarm:"+e,side+" JCC 支桿",tur,Vector3.Lerp(tur.position,cell.position,k*.19f)+new Vector3(0,0,-.004f),.007f,tur);Control("jcc:"+e,side+" JCC 交叉圓柱鏡",cell,cell.position+new Vector3(0,0,-.002f),.0155f,N("Turret_"+en));
      Control("flip:"+e,side+" JCC 翻面滾輪",cell,cell.position+new Vector3(.0215f,0,0),.006f,cell);Control("flip:"+e,side+" JCC 翻面滾輪",cell,cell.position+new Vector3(-.0215f,0,0),.006f,cell);}
    }
    Control("pd","P.D. 旋鈕（瞳距）",N("PDWheel"),N("PDWheel").position,.015f,null);
@@ -157,7 +191,7 @@ namespace RefractionRoom {
    Sign("視 光 室",new Vector3(0,2.55f,5.78f),new Vector3(0,0,0),.078f,new Color(.89f,.87f,.76f));
    Sign("THE REFRACTION ROOM",new Vector3(0,2.32f,5.78f),Vector3.zero,.03f,new Color(.70f,.72f,.62f));
    Sign("6 m  /  DISTANCE ACUITY",new Vector3(0,2.07f,-1.50f),new Vector3(0,180,0),.027f,new Color(.19f,.28f,.25f));
-   Sign("清潔與檢查工具",new Vector3(-2.0f,1.17f,4.55f),new Vector3(0,90,0),.024f,new Color(.25f,.32f,.28f));
+   Sign("升降驗光桌",new Vector3(1.08f,.84f,3.80f),Vector3.zero,.024f,new Color(.25f,.32f,.28f));
    Sign("01  /  診間",new Vector3(2.65f,2.12f,-2.30f),new Vector3(0,180,0),.032f,new Color(.88f,.89f,.81f));
    var bottle=N("Sanitizer");if(bottle){var t=Text3D("Alcohol label",bottle,bottle.position+new Vector3(0,-.012f,.0335f),"75% 酒精",.0085f,new Color(.95f,.97f,.96f));t.transform.rotation=bottle.rotation*Quaternion.Euler(0,180,0);}
   }
@@ -195,9 +229,9 @@ namespace RefractionRoom {
    if(!begun){view.transform.position=Vector3.Lerp(view.transform.position,new Vector3(1.05f,1.58f,2.25f),Time.deltaTime);view.transform.rotation=Quaternion.Slerp(view.transform.rotation,Quaternion.Euler(4,-24,0),Time.deltaTime);hands.gameObject.SetActive(false);if(scope)scope.enabled=false;if(ui)ui.Refresh();if(Input.GetMouseButtonDown(0)){mouseDowns++;}if(Time.frameCount%12==0)Emit();return;}
    if(!paused&&!session.completed)session.seconds+=Time.deltaTime;
    if(session.mode=="考試"&&session.seconds>=1080&&!session.completed){session.completed=true;Say("時間到了，請查看這次的紀錄與回饋。",false);notebook=true;Release();}
-   if(Input.GetKeyDown(KeyCode.Escape)){if(pdStep>=0&&!busy)PDExit(false);else{paused=!paused;if(paused)Release();else if(!focused&&!notebook)Lock();}}
-   if(Input.GetKeyDown(KeyCode.Tab)){ToggleNotebook();}
-   if(Input.GetKeyDown(KeyCode.H)){ui.immersive=!ui.immersive;Toast(ui.immersive?"沉浸模式 · H 顯示教學與工具列，鍵盤和實體旋鈕仍可操作。":"已顯示教學與工具列。");}
+   if(Input.GetKeyDown(KeyCode.Escape))TogglePause();
+   if(!paused&&Input.GetKeyDown(KeyCode.Tab)){ToggleNotebook();}
+   if(!paused&&Input.GetKeyDown(KeyCode.H)){ui.immersive=!ui.immersive;Toast(ui.immersive?"沉浸模式 · H 顯示教學與工具列，鍵盤和實體旋鈕仍可操作。":"已顯示教學與工具列。");}
    if(Input.touchCount>0)touchMode=true;
    if(Input.GetMouseButtonDown(0)){mouseDowns++;var es=UnityEngine.EventSystems.EventSystem.current;uiHit="none";if(es){var pe=new UnityEngine.EventSystems.PointerEventData(es){position=Input.mousePosition};var hits=new List<UnityEngine.EventSystems.RaycastResult>();es.RaycastAll(pe,hits);uiHit=hits.Count>0?hits[0].gameObject.name+"/"+hits.Count:"no-hit";}else uiHit="no-eventsystem";}
    bool overUI=UnityEngine.EventSystems.EventSystem.current&&UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
@@ -221,7 +255,7 @@ namespace RefractionRoom {
      if(Input.GetKeyDown(KeyCode.UpArrow)&&focused)Row(-1);
      if(Input.GetKeyDown(KeyCode.DownArrow)&&focused)Row(1);
      if(focused&&held==1){if(Input.GetKeyDown(KeyCode.Z))Streak(-1);if(Input.GetKeyDown(KeyCode.X))Streak(1);if(Input.GetKeyDown(KeyCode.Q))Streak90();}
-     if(focused&&!patientView&&!touchMode){
+     if(focused&&!patientView&&!touchMode&&jccDrag<0){
       RaycastHit kh;if(!overUI&&Physics.Raycast(view.ScreenPointToRay(Input.mousePosition),out kh,1.5f,1<<9))hover=kh.collider.GetComponent<ClinicTarget>();
       if(hover){hoverLabel=hover.label+"\n"+ControlState(hover.id);
        float sc=Input.mouseScrollDelta.y;if(Mathf.Abs(sc)>.1f)UseControl(hover.id,sc>0?1:-1,false);
@@ -247,6 +281,7 @@ namespace RefractionRoom {
     }
     target=null;RaycastHit hit;if(!focused&&pdStep<0&&Physics.Raycast(view.ViewportPointToRay(new Vector3(.5f,.5f)),out hit,2.3f,1<<8))target=hit.collider.GetComponent<ClinicTarget>();focusLabel=target?target.label:"";
    }
+   DragJCC();
    if(!Input.GetMouseButton(1)||!focused){lookYaw=Mathf.Lerp(lookYaw,0,Time.deltaTime*4);lookPitch=Mathf.Lerp(lookPitch,0,Time.deltaTime*4);}
    if(held==1&&!Input.GetMouseButton(0)&&!touchDragging)sweep=Mathf.Lerp(sweep,0,Time.deltaTime*1.2f);
    if(tweening){tweenTime+=Time.deltaTime*1.4f;float t=Mathf.SmoothStep(0,1,tweenTime);view.transform.position=Vector3.Lerp(fromPos,toPos,t);view.transform.rotation=Quaternion.Slerp(fromRot,toRot,t);if(t>=1)tweening=false;}
@@ -256,7 +291,7 @@ namespace RefractionRoom {
    if(saveDirty&&Time.time>saveAt){saveDirty=false;SaveProgress();}
    if(Time.frameCount%12==0){ui.Refresh();Emit();}
   }
-  bool Blocked(Vector3 p){return (p.x<-1.7f&&p.z>2.65f)||(p.x>1.7f&&p.z>.35f&&p.z<3)||(Mathf.Abs(p.x)<.66f&&p.z>4.0f)||(p.x>.3f&&p.x<.95f&&p.z>4.05f&&p.z<4.8f);}
+  bool Blocked(Vector3 p){return (p.x<-1.7f&&p.z>2.65f)||(p.x>.55f&&p.x<1.65f&&p.z>3.7f&&p.z<4.7f)||(Mathf.Abs(p.x)<.66f&&p.z>4.0f)||(p.x>.3f&&p.x<.95f&&p.z>4.05f&&p.z<4.8f);}
   void LateUpdate(){
    if(!models)return;float dt=Time.deltaTime;
    foreach(var kv in drives){var t=kv.Key;if(!t)continue;float k=1-Mathf.Exp(-kv.Value.rate*dt);t.localPosition=Vector3.Lerp(t.localPosition,kv.Value.p,k);t.localRotation=Quaternion.Slerp(t.localRotation,kv.Value.q,k);}
@@ -305,7 +340,7 @@ namespace RefractionRoom {
     Spin("AuxWheel_"+en,Quaternion.Euler(0,0,aux==1?60:aux==2?-60:0),instant,9);
     Spin("Aux_"+en,Quaternion.Euler(0,0,aux==1?30:aux==2?120:0),instant,12);
     Spin("Turret_"+en,Quaternion.Euler(0,0,session.jccMode>0&&e==session.eye?TurretInAngle(e):0),instant,7);
-    var flip=N("JCCFlip_"+en);if(flip&&!busy)DriveTo(flip,homePos[flip.name],homeRot[flip.name],instant,12);
+    var flip=N("JCCFlip_"+en);if(flip&&!busy)DriveTo(flip,homePos[flip.name],homeRot[flip.name]*Quaternion.AngleAxis(jccFace[e]?180:0,Vector3.right),instant,12);
    }
    var bubble=N("Bubble");if(bubble){Vector3 p=homePos["Bubble"];p.x+=Mathf.Clamp(session.level,-5,5)*.0009f;DriveTo(bubble,p,homeRot["Bubble"],instant,6);}
    Spin("LockLever",Quaternion.Euler(0,0,session.prepared[7]?-70:0),instant);
@@ -313,9 +348,11 @@ namespace RefractionRoom {
    Spin("LevelKnob",Quaternion.Euler(session.level*24,0,0),instant);
    Spin("ForeheadKnob",Quaternion.Euler(0,0,(session.vertex-12)*30),instant);
    if(pdNumber)pdNumber.text=session.pd.ToString("0.#");
-   var arm=N("ArmSwing");if(arm){Vector3 p=homePos[arm.name];p.y+=session.height;DriveTo(arm,p,homeRot[arm.name]*Quaternion.Euler(0,session.phoropterIn?0:80,0),instant,2.6f);}
+   var arm=N("ArmSwing");if(arm){Vector3 p=homePos[arm.name];DriveTo(arm,p,homeRot[arm.name]*Quaternion.Euler(0,session.phoropterIn?0:-90,0),instant,2.6f);}
+   var deck=N("LiftDeck");if(deck)DriveTo(deck,homePos[deck.name]+Vector3.up*session.height,homeRot[deck.name],instant,5);
+   foreach(var kv in tools){var t=kv.Value.transform;if(t.parent==models&&!busy)t.position=homePos[kv.Key]+Vector3.up*session.height;}
    // vertex: the head moves toward the eye; the forehead rest keeps touching the brow
-   var phoro=N("Phoropter");if(phoro){Vector3 p=homePos[phoro.name];p.z-=(session.vertex-12)*.001f;DriveTo(phoro,p,homeRot[phoro.name]*Quaternion.Euler(0,0,session.level),instant,5);}
+   var phoro=N("Phoropter");if(phoro){Vector3 p=homePos[phoro.name];p.z-=(session.vertex-12)*.001f;DriveTo(phoro,p,homeRot[phoro.name]*Quaternion.Euler(0,session.phoropterIn?0:90,session.level),instant,5);}
    var rest=N("ForeheadRest");if(rest){Vector3 p=homePos[rest.name];p.z+=(session.vertex-12)*.001f;DriveTo(rest,p,homeRot[rest.name],instant,5);}
    Spin("SwitchLever",Quaternion.Euler(0,0,session.prepared[8]?16:-16),instant);
    foreach(var l in lamps){if(!l)continue;if(l.type==LightType.Directional)l.intensity=session.prepared[8]?.35f:1.15f;else if(l.name.StartsWith("Ceiling"))l.intensity=session.prepared[8]?.18f:.9f;}
@@ -335,8 +372,9 @@ namespace RefractionRoom {
     case "cyl":return "柱面 "+L.c.ToString("0.00")+" DC · 左鍵 +、右鍵 −";
     case "axis":return "軸位 "+Mathf.RoundToInt(L.a)+"° · 滾輪轉動";
     case "aux":int s=AuxState(e);return "目前 "+(s==1?"OC 遮蓋":s==2?"PH 針孔":"O 開放")+(e==session.eye?" · 點擊：O ↔ PH":" · 點擊：O ↔ OC");
-    case "jcc":return session.jccMode==0?"點擊轉入 JCC（軸位 A）":session.jccMode==1?"軸位 A · 點擊轉 45° 到度數 P · 右鍵收回":"度數 P · 點擊轉回軸位 A · 右鍵收回";
-    case "flip":return "點擊翻面比較（空白鍵）";
+    case "jcc":return session.jccMode==0?"拖曳支桿轉入；點擊選 A／P":session.jccMode==1?"軸位 A · 點擊轉 45° 到度數 P · 滾輪翻面 · 右鍵收回":"度數 P · 點擊轉回軸位 A · 滾輪翻面 · 右鍵收回";
+    case "flip":return "滾輪／點擊翻面比較";
+    case "jccarm":return "按住支桿拖曳：轉入窺孔／收回";
     case "pd":return "PD "+session.pd.ToString("0.#")+" mm";
     case "level":return "傾斜 "+session.level.ToString("0")+"°";
     case "vertex":return "頂點距離 "+session.vertex.ToString("0")+" mm（目標 12）";
@@ -354,8 +392,9 @@ namespace RefractionRoom {
     case "cyl":AdjustControl(e,1,sign,1);break;
     case "axis":AdjustControl(e,2,sign,1);break;
     case "aux":if(!clicked)return;if(e==session.eye)Pinhole();else Occlude();break;
-    case "jcc":if(!clicked)return;if(e!=session.eye){Toast("JCC 只放在目前測試眼 "+session.EyeName+" 前。");return;}if(sign<0){if(session.jccMode!=0)SetJCC(0);}else SetJCC(session.jccMode==1?2:1);break;
-    case "flip":if(clicked)Ask();break;
+    case "jcc":if(!clicked){if(e==session.eye&&session.jccMode>0)FlipJCC();return;}if(e!=session.eye){Toast("JCC 只放在目前測試眼 "+session.EyeName+" 前。");return;}if(sign<0){if(session.jccMode!=0)SetJCC(0);}else SetJCC(session.jccMode==1?2:1);break;
+    case "flip":if(e==session.eye&&session.jccMode>0)FlipJCC();break;
+    case "jccarm":if(touchMode&&clicked&&e==session.eye){SetJCC(session.jccMode==0?1:0);break;}if(clicked&&sign>0&&e==session.eye&&session.phoropterIn){jccDrag=e;var t=N("Turret_"+EN[e]);dragStartAngle=PointerAngle(t);dragStartRotation=Mathf.DeltaAngle(0,t.localEulerAngles.z-homeRot[t.name].eulerAngles.z);}break;
     case "pd":if(!session.prepared[1]&&session.mode=="教學"){Toast("先用 PD 尺量出瞳距，再轉 P.D. 旋鈕設定。");return;}session.pd=Mathf.Clamp(session.pd+sign*.5f,50,76);Knob("PDWheel");break;
     case "level":session.level=Mathf.Clamp(session.level-sign,-6,6);if(Mathf.Abs(session.level)<.1f&&!session.prepared[2]){session.prepared[2]=true;Toast("水平氣泡已置中。");session.Log("調整水平");}Knob("LevelKnob");break;
     case "vertex":session.vertex=Mathf.Clamp(session.vertex-sign,8,22);CheckFit();Knob("ForeheadKnob");break;
@@ -366,7 +405,7 @@ namespace RefractionRoom {
   void CheckFit(){if(!session.prepared[5]&&Mathf.Abs(session.height)<.001f&&Mathf.Abs(session.vertex-12)<.1f){session.prepared[5]=true;Toast("窺孔對準瞳孔，頂點距離 12 mm。");session.Log(ClinicSession.PrepNames[5]);}}
   void Knob(string n){Reach(N(n));audioOut.PlayOneShot(tick,.8f);SyncMechanics();DrawChart();MarkSave();}
   void AdjustControl(int e,int p,int sign,int steps){
-   if(!focused)return;if(!session.phoropterIn){Toast("綜合驗光儀還在旁邊，先把它轉到受測者眼前（坐近後點任一準備動作）。");return;}
+   if(!focused||jccDrag>=0)return;if(!session.phoropterIn){Toast("綜合驗光儀還在旁邊，先把它轉到受測者眼前（坐近後點任一準備動作）。");return;}
    session.Adjust(p,sign,steps,e);parameter=p;
    Reach(N((p==0?(steps>1?"StrongSph_":"Sph_"):p==1?"Cyl_":"AxisKnob_")+EN[e]));
    audioOut.PlayOneShot(steps>1?click:tick,.8f);SyncMechanics();DrawChart();MarkSave();
@@ -398,7 +437,7 @@ namespace RefractionRoom {
    if(pdStep>=0)return;
    if(focused&&!patientView){
     if(Physics.Raycast(ray,out h,1.5f,1<<9)){var t=h.collider.GetComponent<ClinicTarget>();touchSel=t.id;touchSelName=t.label;string[] p=t.id.Split(':');
-     if(p[0]=="flip"||p[0]=="lock"||p[0]=="aux"||p[0]=="jcc"){UseControl(t.id,1,true);}else{var tr=t.highlight?t.highlight:t.transform;Reach(tr);audioOut.PlayOneShot(tick,.4f);}}
+     if(p[0]=="flip"||p[0]=="lock"||p[0]=="aux"||p[0]=="jcc"||p[0]=="jccarm"){UseControl(t.id,1,true);}else{var tr=t.highlight?t.highlight:t.transform;Reach(tr);audioOut.PlayOneShot(tick,.4f);}}
     else touchSel="";
     return;
    }
@@ -451,14 +490,14 @@ namespace RefractionRoom {
   public void Begin(string mode){
    string mark="tools";
    try{
-    ReturnTools();held=0;mark="session";session=new ClinicSession();session.patient=ui.selectedPatient;session.mode=mode;session.wdCm=PlayerPrefs.GetFloat("ClinicWD",57);session.EnterStage();begun=true;paused=false;notebook=false;focused=false;patientView=false;pdStep=-1;cinematic=false;handScripted=false;
+    Time.timeScale=1;remoteOwned=false;projectorOn=true;jccDrag=-1;ReturnTools();held=0;mark="session";session=new ClinicSession();session.patient=ui.selectedPatient;session.mode=mode;session.wdCm=PlayerPrefs.GetFloat("ClinicWD",57);session.EnterStage();begun=true;paused=false;notebook=false;focused=false;patientView=false;pdStep=-1;cinematic=false;handScripted=false;
     mark="camera";walkPos=new Vector3(.6f,1.65f,.3f);view.transform.position=walkPos;yaw=0;pitch=0;view.transform.rotation=Quaternion.identity;targetFov=66;hands.gameObject.SetActive(true);ui.menu.SetActive(false);
     mark="patient";ApplyPatient();mark="mechanics";SyncMechanics(true);mark="chart";DrawChart();mark="lock";Lock();mark="say";Say("您好，我看遠有點模糊，今天想檢查度數。",true);mark="save";SaveProgress();
    }catch(Exception ex){Debug.LogError("CLINIC_BEGIN_FAILED at "+mark+": "+ex);begun=true;ui.menu.SetActive(false);hands.gameObject.SetActive(true);}
   }
-  public void Resume(){if(!PlayerPrefs.HasKey("ClinicSession"))return;session=JsonUtility.FromJson<ClinicSession>(PlayerPrefs.GetString("ClinicSession"));if(session.stage>0)session.phoropterIn=true;begun=true;pdStep=-1;cinematic=false;walkPos=new Vector3(.6f,1.65f,.3f);view.transform.position=walkPos;view.transform.rotation=Quaternion.identity;yaw=0;pitch=0;targetFov=66;hands.gameObject.SetActive(true);ui.menu.SetActive(false);ApplyPatient();SyncMechanics(true);DrawChart();Lock();Toast("已恢復病例與教學進度。");}
+  public void Resume(){if(!PlayerPrefs.HasKey("ClinicSession"))return;session=JsonUtility.FromJson<ClinicSession>(PlayerPrefs.GetString("ClinicSession"));remoteOwned=PlayerPrefs.GetInt("ClinicRemote",0)==1||session.prepared[6];projectorOn=true;if(session.stage>0)session.phoropterIn=true;begun=true;paused=false;notebook=false;focused=false;patientView=false;busy=false;Time.timeScale=1;pdStep=-1;cinematic=false;walkPos=new Vector3(.6f,1.65f,.3f);view.transform.position=walkPos;view.transform.rotation=Quaternion.identity;yaw=0;pitch=0;targetFov=66;hands.gameObject.SetActive(true);ui.menu.SetActive(false);ApplyPatient();SyncMechanics(true);DrawChart();Lock();Toast("已恢復病例與教學進度。");}
   void LoadProgress(){ui.canResume=PlayerPrefs.HasKey("ClinicSession");}
-  public void SaveProgress(){if(begun){PlayerPrefs.SetString("ClinicSession",JsonUtility.ToJson(session));PlayerPrefs.Save();if(ui)ui.canResume=true;}}
+  public void SaveProgress(){if(begun){PlayerPrefs.SetInt("ClinicRemote",remoteOwned?1:0);PlayerPrefs.SetString("ClinicSession",JsonUtility.ToJson(session));PlayerPrefs.Save();if(ui)ui.canResume=true;}}
   public void PointerState(string state){lookCaptured=state=="1";}
   public void Lock(){
    if(touchMode)return;
@@ -491,7 +530,7 @@ namespace RefractionRoom {
    if(id=="phoropter"||id=="patient"){if(held==3)Sanitize();else if(held==4)PDBegin();else if(id=="phoropter")Focus();else StartCoroutine(Action("greet",()=>Say("我平常看遠有點糊，沒有突然看不見，也沒有疼痛。",true)));}
    else if(id=="sanitize"){HoldTool("CleaningCloth");held=3;Toast("已拿酒精棉布。走到驗光儀旁按 E：先噴酒精，再擦額托、面罩與 PD 尺。");}
    else if(id=="pd"){HoldTool("PDRuler");held=4;Toast(session.prepared[0]?"已拿 PD 尺。走近受測者按 E 開始量瞳距。":"已拿 PD 尺。PD 尺會碰到受測者臉部，記得先消毒。");}
-   else if(id=="light")Prepare(8);else if(id=="retino")HoldRet();else if(id=="paper")ToggleNotebook();else if(id=="remote"){HoldTool("Remote");held=2;Toast("已拿視標遙控器。F 坐近儀器後可換表。");}else if(id=="chart")PatientPOV();
+   else if(id=="light")Prepare(8);else if(id=="retino")HoldRet();else if(id=="paper")ToggleNotebook();else if(id=="remote"){remoteOwned=true;Release();SaveProgress();Toast("已拿視標遙控器。左下角按鍵可直接換表。");}else if(id=="chart")PatientPOV();
   }
   static bool NeedsPhoropter(int i){return i>=2&&i<=7&&i!=6;}
   public void Prepare(int i){
@@ -503,7 +542,7 @@ namespace RefractionRoom {
   IEnumerator PrepareRoutine(int i){
    if(NeedsPhoropter(i)&&!session.phoropterIn)yield return SwingPhoropter(true);
    yield return Action("prep"+i,()=>{
-    session.prepared[i]=true;if(i==2)session.level=0;if(i==3||i==4){session.ph=false;session.occluded=false;}if(i==5){session.height=0;session.vertex=12;}if(i==6)session.chart=1;
+    session.prepared[i]=true;if(i==2)session.level=0;if(i==3||i==4){session.ph=false;session.occluded=false;}if(i==5){session.height=0;session.vertex=12;}if(i==6){session.chart=1;remoteOwned=true;}
     SyncMechanics();DrawChart();Toast(ClinicSession.PrepNames[i]+"完成");session.Log(ClinicSession.PrepNames[i]);SaveProgress();
    });
   }
@@ -514,13 +553,13 @@ namespace RefractionRoom {
   }
   public void HoldRet(){if(busy||pdStep>=0)return;if(held==1){ReturnTools();held=0;targetFov=focused?FocusFov():66;Toast("已放回檢影鏡。");}else{HoldTool("Retinoscope");held=1;Toast("檢影鏡已拿起。F 坐近後：按住左鍵拖曳滑鼠掃動光帶，Z / X 旋轉光帶。");if(focused){GoTo(FocusPoint(),Quaternion.identity);targetFov=FocusFov();}}session.Log("拿取／放回檢影鏡");}
   void HoldTool(string name){ReturnTools();var t=N(name);if(!t)return;t.SetParent(view.transform,true);t.localPosition=new Vector3(.16f,-.19f,.37f);t.localRotation=name=="PDRuler"?Quaternion.Euler(-60,0,8):name=="CleaningCloth"?Quaternion.Euler(-40,0,0):Quaternion.Euler(0,180,8);}
-  void ReturnTools(){foreach(var kv in tools){var t=kv.Value.transform;t.SetParent(models,true);t.position=homePos[kv.Key];t.rotation=homeRot[kv.Key];}var pump=N("SanitizerPump");if(pump)pump.localPosition=homePos["SanitizerPump"];}
+  void ReturnTools(){foreach(var kv in tools){var t=kv.Value.transform;t.SetParent(models,true);t.position=homePos[kv.Key]+Vector3.up*session.height;t.rotation=homeRot[kv.Key];}var pump=N("SanitizerPump");if(pump)pump.localPosition=homePos["SanitizerPump"];}
   public void Adjust(int sign){if(!focused)return;AdjustControl(session.eye,parameter,sign,1);}
   public void SetParameter(int p){parameter=p;Toast(new[]{"球面 · 每格 0.25 D（外側大轉盤）","負柱面 · 每格 0.25 DC（內鈕；每 -0.50DC 自動 +0.25DS）","散光軸 · 每格 5°（外圈軸鈕）"}[p]);}
   public void SelectEye(){if(busy)return;session.eye=1-session.eye;session.jccMode=0;session.ph=false;SyncMechanics();if(focused&&held==1)GoTo(FocusPoint(),Quaternion.identity);DrawChart();Toast("目前測試 "+session.EyeName);}
   public void Occlude(){if(busy)return;if(!session.phoropterIn){Toast("先把驗光儀轉到受測者眼前。");return;}StartCoroutine(Action("occluder",()=>{session.occluded=!session.occluded;SyncMechanics();Toast(session.occluded?"非測試眼的輔助鏡片轉到 OC（遮蓋）。":"非測試眼轉回 O（開放）。");}));}
   public void Pinhole(){if(busy)return;if(!session.phoropterIn){Toast("先把驗光儀轉到受測者眼前。");return;}StartCoroutine(Action("pinhole",()=>{session.ph=!session.ph;SyncMechanics();DrawChart();Toast(session.ph?"測試眼輔助鏡片轉到 PH（針孔）。":"測試眼輔助鏡片轉回 O。");}));}
-  public void ChangeChart(int c){if(busy)return;StartCoroutine(Action("remote",()=>{session.chart=c;DrawChart();Toast(new[]{"E 字視標","紅綠視標","JCC 蜂巢點陣"}[c]);}));}
+  public void ChangeChart(int c){if(busy)return;remoteOwned=true;projectorOn=true;StartCoroutine(Action("remote",()=>{session.chart=c;if(c==1){session.prepared[6]=true;session.Log(ClinicSession.PrepNames[6]);}DrawChart();MarkSave();Toast(new[]{"E 字視標","紅綠視標","JCC 蜂巢點陣"}[c]);}));}
   public void Row(int sign){int k=0;for(int i=0;i<Optics.Rows.Length;i++)if(Mathf.Abs(session.row-Optics.Rows[i])<.01f)k=i;k=Mathf.Clamp(k+sign,0,Optics.Rows.Length-1);session.row=Optics.Rows[k];DrawChart();audioOut.PlayOneShot(tick);}
   public void Fog(){if(busy)return;float amount=session.Phase==5?.5f:1;var e=session.eye;StartCoroutine(Action("knob:Sph_"+EN[e],()=>{Rx r=session.H.lens;r.s+=amount;session.H.lens=r;if(session.Phase==5)session.H.secondFogged=true;else session.H.fogged=true;session.H.highestFog=amount;session.Log("霧視 +"+amount.ToString("0.00")+"D");SyncMechanics();DrawChart();Toast("加 +"+amount.ToString("0.00")+" D 霧視；逐格退正並反覆確認視力。");SaveProgress();}));}
   public void CycleJCC(){if(busy)return;SetJCC((session.jccMode+1)%3);}
@@ -550,11 +589,18 @@ namespace RefractionRoom {
    if(busy||!focused)return;
    if(!session.occluded&&session.stage>=4){Toast("先把非測試眼的輔助鏡片轉到 OC，受測者才會只用測試眼比較。");return;}
    if(session.stage==1||session.stage==2){Sweep();return;}
+   if(!projectorOn){Toast("請先開啟投影視標。");return;}
    if(session.chart==1){StartCoroutine(Action("ask",()=>{session.H.duoAsked=true;Say(Optics.Duo(session.Truth(session.eye),session.H.lens),true);session.Log("紅綠問答");}));return;}
    if(session.jccMode>0){StartCoroutine(CompareJCC());return;}
    StartCoroutine(Action("ask",()=>{session.Read();int n=session.H.lastLetters;string[] dirs={"上","右","下","左","上"};string s="";for(int i=0;i<5;i++)s+=(i<n?dirs[i]:"看不清楚")+(i<4?"、":"。");Say("這一排："+s+(n<5?"後面有點糊。":""),true);
     float bv,lm;string lab=Optics.VALabel(session.row,n,out bv,out lm);if(session.mode!="考試")Toast("列 "+session.row.ToString("0.0")+" 讀對 "+n+"/5"+(lab!=""?" → 記為 "+lab:" → 這列讀不到，換大一列")+"（3–4 個記「該列 −錯幾個」，1–2 個記「上一列 +讀對幾個」）");SaveProgress();}));
   }
+  void FlipJCC(){if(busy||!session.occluded){Toast("先遮蓋非測試眼，再翻面比較。");return;}StartCoroutine(FlipOnce());}
+  IEnumerator FlipOnce(){busy=true;int e=session.eye;var t=N("JCCFlip_"+EN[e]);jccFace[e]=!jccFace[e];Reach(N("JCCCell_"+EN[e]));
+   if(t)DriveTo(t,homePos[t.name],homeRot[t.name]*Quaternion.AngleAxis(jccFace[e]?180:0,Vector3.right),false,14);
+   audioOut.PlayOneShot(click,.5f);yield return new WaitForSeconds(.28f);
+   if(!jccFace[e]){session.RegisterJCC();Say(Optics.CompareJCC(session.Truth(e),session.H.lens,session.jccMode==1),true);}
+   else Toast("JCC 已翻面；再滾一格看另一面並比較。");busy=false;SaveProgress();}
   IEnumerator CompareJCC(){
    busy=true;animationLog.Add("jcc-compare");string en=EN[session.eye];Transform flip=N("JCCFlip_"+en);Reach(N("JCCCell_"+en));
    Say("第一面……第二面，哪一面比較清楚？",false);
@@ -565,7 +611,7 @@ namespace RefractionRoom {
     audioOut.PlayOneShot(click,.5f);yield return new WaitForSeconds(.5f);
    }
    if(flip)DriveTo(flip,homePos[flip.name],rest,false,10);
-   session.RegisterJCC();Say(Optics.CompareJCC(session.Truth(session.eye),session.H.lens,session.jccMode==1),true);busy=false;session.Log("JCC 兩面比較");SaveProgress();
+   jccFace[session.eye]=false;session.RegisterJCC();Say(Optics.CompareJCC(session.Truth(session.eye),session.H.lens,session.jccMode==1),true);busy=false;session.Log("JCC 兩面比較");SaveProgress();
   }
   public void Record(){if(busy)return;StartCoroutine(Action("record",()=>{session.Save();Toast("已寫入紙本紀錄："+session.EyeName+" "+session.H.lens);SaveProgress();}));}
   public void Next(){if(busy||pdStep>=0)return;var missing=session.Missing();if(session.mode=="教學"&&missing.Count>0){Toast("還需要："+missing[0]);return;}ReturnTools();held=0;targetFov=focused?FocusFov():66;session.Advance();if(session.stage>0&&!session.phoropterIn){session.phoropterIn=true;}SyncMechanics();DrawChart();SaveProgress();if(session.completed){notebook=true;Release();Toast("期中流程完成，請查看雙眼紀錄與回饋。");}else{Toast(session.StageTitle);if(focused)GoTo(FocusPoint(),Quaternion.identity);}Emit();}
@@ -762,6 +808,7 @@ namespace RefractionRoom {
     ChartZoom=Mathf.Clamp(eh*13/w,.06f,1);
     for(int k=0;k<count;k++)E(pix,w,h,start+k*gap,h/2-eh/2,scale,new int[]{1,0,3,2,1}[k],ink);
    }
+   if(!projectorOn)System.Array.Fill(pix,new Color32(10,12,12,255));
    if(patientView){float b=Optics.Blur(session.Truth(session.eye),session.H.lens,session.ph);int radius=Mathf.Clamp(Mathf.RoundToInt(b*3),0,12);if(radius>0)pix=BlurTexture(pix,w,h,radius);}
    chartTex.SetPixels32(pix);chartTex.Apply(false);
   }
@@ -783,10 +830,11 @@ namespace RefractionRoom {
    #endif
   }
   public void QATimeScale(string s){if(Application.absoluteURL.Contains("qa=1")||Application.isEditor)Time.timeScale=Mathf.Clamp(float.Parse(s,System.Globalization.CultureInfo.InvariantCulture),.05f,4);}
+  public void QADirectScene(){if(!Application.absoluteURL.Contains("qa=1")&&!Application.isEditor)return;Begin("自由");session.height=0;session.level=0;session.vertex=12;session.pd=64;session.stage=10;session.eye=0;session.EnterStage();session.phoropterIn=true;session.occluded=true;session.jccMode=0;remoteOwned=true;view.transform.position=new Vector3(0,1.6f,3.4f);Focus();Release();SyncMechanics(true);DrawChart();ui.Refresh();Emit();}
   public void RunQA(){var qa=GetComponent<ClinicQA>();if(!qa)qa=gameObject.AddComponent<ClinicQA>();qa.Run();}
-  public string Evidence(){return JsonUtility.ToJson(new EvidenceData{stage=session.stage,eye=session.eye,mode=session.mode,begun=begun,focused=focused,busy=busy,missing=session.Missing().Count,animationCount=animationLog.Count,x=view.transform.position.x,z=view.transform.position.z,rx=session.H.lens.ToString(),action=lastAction,completed=session.completed,pd=session.pd,pdStep=pdStep,phoropterIn=session.phoropterIn,mouseDowns=mouseDowns,uiHit=uiHit,examinerEye=examinerEye,odYaw=EyeYaw(0),osYaw=EyeYaw(1)});
+  public string Evidence(){return JsonUtility.ToJson(new EvidenceData{jccMode=session.jccMode,remote=remoteOwned,projector=projectorOn,row=session.row,chart=session.chart,jccFace=jccFace[session.eye],stage=session.stage,eye=session.eye,mode=session.mode,begun=begun,focused=focused,busy=busy,missing=session.Missing().Count,animationCount=animationLog.Count,x=view.transform.position.x,z=view.transform.position.z,rx=session.H.lens.ToString(),action=lastAction,completed=session.completed,pd=session.pd,pdStep=pdStep,phoropterIn=session.phoropterIn,mouseDowns=mouseDowns,uiHit=uiHit,examinerEye=examinerEye,odYaw=EyeYaw(0),osYaw=EyeYaw(1)});
   float EyeYaw(int e){var t=N("Eye_"+EN[e]);if(!t)return 0;Vector3 f=t.rotation*Vector3.back;return Mathf.Atan2(f.x,-f.z)*Mathf.Rad2Deg;}}
-  [Serializable] public class EvidenceData{public int stage,eye,missing,animationCount,pdStep,mouseDowns,examinerEye;public float odYaw,osYaw;public string mode,rx,action,uiHit;public bool begun,focused,busy,completed,phoropterIn;public float x,z,pd;}
+  [Serializable] public class EvidenceData{public int jccMode,chart;public bool remote,projector,jccFace;public float row;public int stage,eye,missing,animationCount,pdStep,mouseDowns,examinerEye;public float odYaw,osYaw;public string mode,rx,action,uiHit;public bool begun,focused,busy,completed,phoropterIn;public float x,z,pd;}
   void Emit(){
    #if UNITY_WEBGL && !UNITY_EDITOR
    ClinicTelemetry(Evidence());

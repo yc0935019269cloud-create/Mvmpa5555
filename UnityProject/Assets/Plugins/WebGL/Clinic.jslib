@@ -1,4 +1,5 @@
 mergeInto(LibraryManager.library, {
+ ClinicMusicVolume: function(volume){var audio=document.getElementById("clinic-music");if(audio)audio.volume=Math.max(0,Math.min(1,volume));},
  ClinicCapture: function(enabled){
   window.clinicWantsLook=!!enabled;
   if(!enabled){try{if(document.pointerLockElement)document.exitPointerLock();}catch(e){}return;}

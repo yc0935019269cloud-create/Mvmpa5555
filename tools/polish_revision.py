@@ -1,0 +1,10 @@
+from pathlib import Path
+p=Path('UnityProject/Assets/Scripts/ClinicUI.cs');s=p.read_text(encoding='utf-8');s=s.replace('  void Place(string n,', '''  Sprite RemoteShape(){int n=64,r=12;var tex=new Texture2D(n,n,TextureFormat.RGBA32,false);for(int y=0;y<n;y++)for(int x=0;x<n;x++){float dx=Mathf.Max(r-x,0,x-(n-1-r)),dy=Mathf.Max(r-y,0,y-(n-1-r));tex.SetPixel(x,y,new Color(1,1,1,Mathf.Clamp01(r-Mathf.Sqrt(dx*dx+dy*dy))));}tex.Apply();return Sprite.Create(tex,new UnityEngine.Rect(0,0,n,n),new Vector2(.5f,.5f),100,0,SpriteMeshType.FullRect,new Vector4(r,r,r,r));}
+  void Place(string n,''')
+s=s.replace('   Txt("remote label",remotePanel.transform,', '''   var shape=RemoteShape();remotePanel.GetComponent<Image>().sprite=shape;remotePanel.GetComponent<Image>().type=Image.Type.Sliced;
+   foreach(var b in remotePanel.GetComponentsInChildren<Button>()){b.GetComponent<Image>().sprite=shape;b.GetComponent<Image>().type=Image.Type.Sliced;b.GetComponentInChildren<Text>().fontSize=14;var sh=b.gameObject.AddComponent<Shadow>();sh.effectColor=new Color(0,0,0,.85f);sh.effectDistance=new Vector2(1,-3);}
+   var bodyShadow=remotePanel.AddComponent<Shadow>();bodyShadow.effectColor=new Color(0,0,0,.65f);bodyShadow.effectDistance=new Vector2(5,-6);
+   Txt("remote label",remotePanel.transform,''')
+p.write_text(s,encoding='utf-8')
+p=Path('UnityProject/Assets/Scripts/ClinicWorld.cs');s=p.read_text(encoding='utf-8');s=s.replace('session.stage=10;session.eye=0;', 'session.height=0;session.level=0;session.vertex=12;session.pd=64;session.stage=10;session.eye=0;');p.write_text(s,encoding='utf-8')
+p=Path('UnityProject/Assets/WebGLTemplates/Clinic/index.html');s=p.read_text(encoding='utf-8').replace('<pre id="qa-state">','<button id="qa-speed">驗證加速</button><button id="qa-hide">隱藏檢查列</button><pre id="qa-state">');s=s.replace("document.getElementById('qa-direct').onclick=", "document.getElementById('qa-speed').onclick=()=>instance.SendMessage('Clinic runtime','QATimeScale','4');document.getElementById('qa-hide').onclick=()=>document.getElementById('qa-bar').style.display='none';document.getElementById('qa-direct').onclick=");p.write_text(s,encoding='utf-8')

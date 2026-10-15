@@ -1,7 +1,7 @@
 [
   {
     "asset": "Architecture",
-    "objects": 297,
+    "objects": 287,
     "source": "RefractionRoom.blend"
   },
   {
@@ -51,12 +51,12 @@
   },
   {
     "asset": "PhoropterStand",
-    "objects": 15,
+    "objects": 23,
     "source": "RefractionRoom.blend"
   },
   {
     "asset": "Remote",
-    "objects": 10,
+    "objects": 30,
     "source": "RefractionRoom.blend"
   },
   {
