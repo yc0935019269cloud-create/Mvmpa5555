@@ -592,7 +592,7 @@ namespace RefractionRoom {
    if(!projectorOn){Toast("請先開啟投影視標。");return;}
    if(session.chart==1){StartCoroutine(Action("ask",()=>{session.H.duoAsked=true;Say(Optics.Duo(session.Truth(session.eye),session.H.lens),true);session.Log("紅綠問答");}));return;}
    if(session.jccMode>0){StartCoroutine(CompareJCC());return;}
-   StartCoroutine(Action("ask",()=>{session.Read();int n=session.H.lastLetters;string[] dirs={"上","右","下","左","上"};string s="";for(int i=0;i<5;i++)s+=(i<n?dirs[i]:"看不清楚")+(i<4?"、":"。");Say("這一排："+s+(n<5?"後面有點糊。":""),true);
+   StartCoroutine(Action("ask",()=>{session.Read();int n=session.H.lastLetters;int ri=Optics.RowIndex(session.row);string[] word={"右","上","左","下"};string s="";for(int i=0;i<5;i++)s+=(i<n?word[Optics.RowRot(ri,i)]:"看不清楚")+(i<4?"、":"。");Say("這一排："+s+(n<5?"後面有點糊。":""),true);
     float bv,lm;string lab=Optics.VALabel(session.row,n,out bv,out lm);if(session.mode!="考試")Toast("列 "+session.row.ToString("0.0")+" 讀對 "+n+"/5"+(lab!=""?" → 記為 "+lab:" → 這列讀不到，換大一列")+"（3–4 個記「該列 −錯幾個」，1–2 個記「上一列 +讀對幾個」）");SaveProgress();}));
   }
   void FlipJCC(){if(busy||!session.occluded){Toast("先遮蓋非測試眼，再翻面比較。");return;}StartCoroutine(FlipOnce());}
@@ -806,7 +806,7 @@ namespace RefractionRoom {
     float eh=(2*6*Mathf.Tan(2.5f*Mathf.Deg2Rad/60)/Mathf.Max(.1f,session.row))/1.08f*w;
     float scale=eh/5;int count=5;float gap=eh*2;float start=(w-(count-1)*gap-eh)/2;
     ChartZoom=Mathf.Clamp(eh*13/w,.06f,1);
-    for(int k=0;k<count;k++)E(pix,w,h,start+k*gap,h/2-eh/2,scale,new int[]{1,0,3,2,1}[k],ink);
+    int ri=Optics.RowIndex(session.row);for(int k=0;k<count;k++)E(pix,w,h,start+k*gap,h/2-eh/2,scale,Optics.RowRot(ri,k),ink);
    }
    if(!projectorOn)System.Array.Fill(pix,new Color32(10,12,12,255));
    if(patientView){float b=Optics.Blur(session.Truth(session.eye),session.H.lens,session.ph);int radius=Mathf.Clamp(Mathf.RoundToInt(b*3),0,12);if(radius>0)pix=BlurTexture(pix,w,h,radius);}

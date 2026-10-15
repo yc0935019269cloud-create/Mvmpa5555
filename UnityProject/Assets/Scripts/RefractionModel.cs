@@ -26,7 +26,12 @@ namespace RefractionRoom {
    if(Mathf.Abs(first-second)<.03f)return "兩片差不多清楚。";
    return first<second?"第一片比較清楚。":"第二片比較清楚。";
   }
-  public static readonly float[] Rows={.1f,.2f,.3f,.4f,.5f,.6f,.7f,.8f,.9f,1f,1.2f};
+  public static readonly float[] Rows={.1f,.2f,.3f,.4f,.5f,.6f,.7f,.8f,.9f,1f,1.2f,1.5f,2f};
+  public static readonly string[] Snellen={"6/60","6/30","6/20","6/15","6/12","6/10","6/8.6","6/7.5","6/6.7","6/6","6/5","6/4","6/3"};
+  public static int LettersOnRow(int i){return 5;}
+  // tumbling-E orientation per letter (0 right, 1 up, 2 left, 3 down), fixed like a printed chart
+  public static int RowRot(int i,int k){int[][] t={new[]{0,3,1,2,1},new[]{2,0,3,1,3},new[]{1,2,0,3,0},new[]{3,1,2,0,2},new[]{0,2,1,3,1},new[]{2,3,0,1,0},new[]{3,0,1,2,3},new[]{1,3,2,0,2},new[]{0,1,3,2,0},new[]{2,1,0,3,1},new[]{3,2,1,0,3},new[]{1,0,3,2,0},new[]{0,2,3,1,2}};return t[Mathf.Clamp(i,0,t.Length-1)][k%5];}
+  public static int RowIndex(float row){int i=0;for(int k=0;k<Rows.Length;k++)if(Mathf.Abs(Rows[k]-row)<.01f)i=k;return i;}
   // Five optotypes per line, 0.02 logMAR per letter: letters correct on a line for the current lens.
   public static int LettersRead(Rx truth,Rx lens,bool ph,float row){float v=Acuity(truth,lens,ph);float d=Mathf.Log10(row)-Mathf.Log10(v);return Mathf.Clamp(Mathf.RoundToInt(5-d/.02f),0,5);}
   // Clinical notation: 5/5 -> line; 3-4/5 -> line -missed; 1-2/5 -> previous line +read.
