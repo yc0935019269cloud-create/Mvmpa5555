@@ -9,6 +9,9 @@ $projectRoot=Split-Path $PSScriptRoot -Parent
 if(-not $SkipModels){
  & $Blender --background --python (Join-Path $projectRoot 'Blender\build_clinic.py')
  if($LASTEXITCODE -ne 0){throw 'Blender model export failed'}
+ # patient and gloved hands: needs the MPFB extension + makehuman_system_assets (CC0) installed in Blender
+ & $Blender --background --python (Join-Path $projectRoot 'Blender\build_people.py')
+ if($LASTEXITCODE -ne 0){throw 'MPFB people export failed'}
 }
 & $Python (Join-Path $PSScriptRoot 'subset_font.py')
 if($LASTEXITCODE -ne 0){throw 'Font subset failed (install fonttools)'}

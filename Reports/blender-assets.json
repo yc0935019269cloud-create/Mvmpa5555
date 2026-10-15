@@ -30,11 +30,6 @@
     "source": "RefractionRoom.blend"
   },
   {
-    "asset": "Patient",
-    "objects": 79,
-    "source": "RefractionRoom.blend"
-  },
-  {
     "asset": "PDRuler",
     "objects": 5,
     "source": "RefractionRoom.blend"

@@ -45,6 +45,9 @@
 | `UnityProject/` | 可編輯的 Unity 專案，開 `Assets/Scenes/Clinic.unity` |
 | `Blender/RefractionRoom.blend` | 全部自製場景、人物、手與工具原始模型 |
 | `Blender/build_clinic.py` | 可重建 Blender 模型、FBX 及公尺座標 mesh interchange |
+| `Blender/build_people.py` | 用 MPFB 2 產生坐姿病人與戴手套的第一人稱雙手（蒙皮網格），須在 build_clinic.py 之後執行 |
+| `Blender/People.blend` | build_people.py 產生的可編輯人物檔 |
+| `UnityProject/Assets/Models/Textures/` | MakeHuman CC0 貼圖（皮膚、頭髮、眉毛、睫毛、衣服、鞋） |
 | `UnityProject/Assets/Models/*.clinicmesh.json` | 從 Blender 真實頂點與階層匯出的資料，避免 FBX 巢狀空節點轉軸問題 |
 | `UnityProject/Assets/Generated/` | Unity 產生的模型 mesh 與材質，不是 Unity primitive 替身 |
 | `docs/` | **Unity 實際產生的 WebGL** 網站，含 wasm/data/loader |
@@ -62,7 +65,7 @@ Windows 已安裝 Unity **6000.6.5f1（含 WebGL Support）**、Blender 5.2，Py
 ./tools/build.ps1
 ```
 
-也可在 Unity 選單依序執行 `Clinic > Validate clinical model`、`Clinic > Generate scene`、`Clinic > Build WebGL`。Unity Build 會重建場景並執行 C# 臨床邏輯檢查。Blender 模型來源為自行建立，字型為 SIL OFL 1.1 的 Noto Sans CJK TC（附字型授權及產生子集工具）。
+也可在 Unity 選單依序執行 `Clinic > Validate clinical model`、`Clinic > Generate scene`、`Clinic > Build WebGL`。Unity Build 會重建場景並執行 C# 臨床邏輯檢查。場景、儀器與工具的 Blender 模型為自行建立，病人與手形來自 MakeHuman CC0 素材（見下方「人物模型來源」），字型為 SIL OFL 1.1 的 Noto Sans CJK TC（附字型授權及產生子集工具）。
 
 本機可用 `python -m http.server 9035 --directory docs`，瀏覽器開 `http://127.0.0.1:9035/`。WebGL 使用 gzip + Unity decompression fallback，GitHub Pages 不需自訂 Content-Encoding headers。
 
@@ -70,7 +73,7 @@ Windows 已安裝 Unity **6000.6.5f1（含 WebGL Support）**、Blender 5.2，Py
 
 光學以雙角功率向量計算。JCC 使用 ±0.25D，負柱面每增加 -0.50DC 自動補 +0.25DS；工作距離只從球面扣除。檢影反射與 JCC 回答由當前鏡片決定，不依任務編號給固定答案。臨床模型測試涵蓋六病例、軸位邊界、兩子午線中和、紅綠方向、PH、等效補償及更動鏡片後紀錄失效。
 
-這是**風格化 3D 教學模擬**，模糊、調節與患者回答為近似模型；不等同真實病人的反應，也不能輸出臨床處方。模型為剛性分件搭配 Unity 程式動畫，並非真人動作捕捉。未聲稱涵蓋所有眼科檢查或全部驗光設備。
+這是**風格化 3D 教學模擬**，模糊、調節與患者回答為近似模型；不等同真實病人的反應，也不能輸出臨床處方。儀器為剛性分件、人物為簡單蒙皮（頭、下巴、上眼瞼、手指），皆由 Unity 程式動畫驅動，並非真人動作捕捉。未聲稱涵蓋所有眼科檢查或全部驗光設備。
 
 實際完成的建置與瀏覽器檢查請看 `Reports/ACCEPTANCE.md`。每次工作交接請先讀 `AGENTS.md` 和 `SESSION_NOTES.md`。
 
@@ -83,3 +86,7 @@ JCC：按住外側支桿沿轉盤圓弧拖曳，放開後吸附到窺孔或收�
 ## 背景音樂與 ESC 選單
 
 背景音樂為使用者提供的「Blue Oiia - Uiia Cat.mp3」，瀏覽器第一次點擊或按鍵後開始循環播放。ESC 可調整音量（預設 20%，0% 靜音，跨次保留）、繼續、保存進度回主選單或放棄這輪。放棄前會再確認，只清除這輪存檔；音量與工作距離偏好保留。暫停時驗光動作及計時停止，背景音樂繼續。
+
+## 人物模型來源（2026-10-16）
+
+病人身體、臉、頭髮、眉毛、睫毛、衣服（白 T 恤＋牛仔褲）、鞋子與雙手的手形，來自 MakeHuman 的 **makehuman_system_assets（CC0 1.0）**，用 Blender 擴充 **MPFB 2.0.18**（GPL 授權，只當產生工具使用，沒有放進本專案或網站）產生。眼睛（鞏膜、虹膜、角膜緣、瞳孔、反光點）仍是本專案自製，尺寸對準新臉的眼窩。手套為單色材質。重建前需在 Blender 安裝 MPFB 並載入該素材包；`tools/build.ps1` 會依序跑 build_clinic.py 和 build_people.py。

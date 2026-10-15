@@ -17,7 +17,7 @@ namespace RefractionRoom {
   RawImage chartRaw;Text chartTitle;
   GameObject remotePanel; Text remoteStatus;
   GameObject chartPanel,hud,station,book,pausedPanel,retPanel,pdPanel,tipBox,crossObj,touchPad,stickObj,walkButtons,knobBar,pdButtons,shadeL,shadeR;
-  public ClinicStick stick;CanvasScaler scaler;Text knobLabel,wdText,wdPrepText,wdHint,sweepText;RectTransform sweepAxis,sweepDot;
+  public ClinicStick stick;CanvasScaler scaler;Text knobLabel,wdText,wdPrepText,wdHint,sweepText;Button wdChip;GameObject wdPicker;List<Button> wdOpts=new List<Button>();RectTransform sweepAxis,sweepDot;
   Text task,step,patient,clock,mission,helper,context,toast,conversation,readout,retReadout,record,bookTitle,previewLabel,patientChoice,tip,pdText,pdReading;
   Button next,resume;Text volumeLabel;Slider musicSlider;GameObject abandonConfirm;
   List<Button> prepButtons=new List<Button>();
@@ -59,8 +59,15 @@ namespace RefractionRoom {
    touchPad=Panel("Touch pad",hud.transform,0,0,4000,3000,new Vector2(.5f,.5f),new Color(0,0,0,0));touchPad.AddComponent<ClinicTouchPad>().world=world;
    var top=Panel("Header",hud.transform,0,413,1540,55,new Vector2(.5f,.5f),dark);
    Txt("brand",top.transform,"視光室  /  REFRACTION",-587,0,320,50,19,pale,new Vector2(.5f,.5f));
-   patient=Txt("patient",top.transform,"",-190,0,420,50,17,muted,new Vector2(.5f,.5f));
-   clock=Txt("clock",top.transform,"",122,0,330,50,18,accent,new Vector2(.5f,.5f));
+   patient=Txt("patient",top.transform,"",-250,0,320,50,17,muted,new Vector2(.5f,.5f));
+   clock=Txt("clock",top.transform,"",232,0,190,50,18,accent,new Vector2(.5f,.5f));
+   // always-visible working-distance selector (opens a picker with every option)
+   wdChip=Btn("wd chip",top.transform,"",12,0,190,38,()=>{wdPicker.SetActive(!wdPicker.activeSelf);},true);
+   wdPicker=Panel("WD picker",hud.transform,0,300,560,170,new Vector2(.5f,.5f),dark);
+   Txt("wd picker title",wdPicker.transform,"檢影工作距離（手臂到病人眼睛的距離）",0,58,520,32,18,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
+   for(int i=0;i<ClinicWorld.WDOptions.Length;i++){float cm=ClinicWorld.WDOptions[i];var b=Btn("wd opt "+cm,wdPicker.transform,cm+" cm",-195+(i%4)*130,12-(i/4)*48,120,40,()=>{world.SetWD(cm);wdPicker.SetActive(false);});wdOpts.Add(b);}
+   wdHint=Txt("wd picker hint",wdPicker.transform,"",0,-72,520,26,14,muted,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
+   wdPicker.SetActive(false);
    Btn("notebook",top.transform,"病歷  Tab",445,0,130,38,()=>world.ToggleNotebook());
    Btn("voice",top.transform,"語音 開／關",589,0,140,38,()=>{voice=!voice;world.Toast(voice?"受測者語音已開啟。":"受測者語音已關閉。 ");});
    Btn("pause",top.transform,"Esc",703,0,60,38,()=>world.TogglePause());
@@ -220,8 +227,8 @@ namespace RefractionRoom {
    if(!play)return;
    task.text=s.StageTitle;step.text="STEP "+(s.stage+1).ToString("00")+" / 17  ·  "+s.mode;
    task.transform.parent.gameObject.SetActive(!immersive&&!world.cinematic);
-   patient.text=s.PatientName+" · 病例 "+s.patient.ToString("00")+" · "+s.EyeName+" · WD "+s.wdCm+"cm";
-   string wdLabel=s.wdCm+" cm · "+Optics.WD(s.wdCm).ToString("0.00")+" D";if(wdPrepText)wdPrepText.text=wdLabel;if(wdText)wdText.text=s.wdCm+"cm";
+   patient.text=s.PatientName+" · 病例 "+s.patient.ToString("00")+" · "+s.EyeName;
+   string wdLabel=s.wdCm+" cm · "+Optics.WD(s.wdCm).ToString("0.00")+" D";if(wdPrepText)wdPrepText.text=wdLabel;if(wdChip){wdChip.GetComponentInChildren<Text>().text="工作距離 "+s.wdCm+" cm";foreach(var b in wdOpts){bool on=b.name=="wd opt "+s.wdCm;b.GetComponent<Image>().color=on?accent:lighter;b.GetComponentInChildren<Text>().color=on?dark:pale;}if(wdHint)wdHint.text=s.wdRemoved?"已從兩眼扣除工作距離，要改請重新開始病例":"目前 "+wdLabel+"，檢影後從兩眼球面扣除";}if(wdText)wdText.text=s.wdCm+"cm";
    int sec=Mathf.FloorToInt(s.mode=="考試"?Mathf.Max(0,1080-s.seconds):s.seconds);clock.text=(s.mode=="考試"?"剩餘 ":"練習 ")+string.Format("{0:00}:{1:00}",sec/60,sec%60)+"  /  六公尺視標";
    var missing=s.Missing();mission.text=s.mode=="考試"?"依期中檢查流程獨立操作。\n完成時按 Enter 前往下一階段。":missing.Count==0?"✓ 這一步的條件已完成。\n按 Enter 前往下一步。":string.Join("\n",missing.GetRange(0,Mathf.Min(4,missing.Count)).ConvertAll(x=>"・"+x));
    next.interactable=!world.busy&&(missing.Count==0||s.mode=="自由"||s.mode=="考試");

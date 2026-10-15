@@ -310,7 +310,7 @@ namespace RefractionRoom {
    if(Time.time>blinkAt){blinkT=0;blinkAt=Time.time+UnityEngine.Random.Range(2.5f,5.5f);}
    float blink=0;if(blinkT>=0){blinkT+=Time.deltaTime/.16f;blink=Mathf.Sin(Mathf.Clamp01(blinkT)*Mathf.PI);if(blinkT>=1)blinkT=-1;}
    foreach(string n in new[]{"Lid_OD","Lid_OS"}){var l=N(n);if(l)l.localRotation=homeRot[n]*Quaternion.Euler(-40*blink,0,0);}
-   var mouth=N("MouthOpening");if(mouth){Vector3 o=homeScale[mouth.name];mouth.localScale=new Vector3(o.x,o.y*(Time.time<talkTime?1+Mathf.Abs(Mathf.Sin(Time.time*17))*7:.25f),o.z);}
+   var jaw=N("Jaw");if(jaw)jaw.localRotation=homeRot[jaw.name]*Quaternion.Euler(Time.time<talkTime?-(1.5f+Mathf.Abs(Mathf.Sin(Time.time*17))*4.5f):0,0,0);
    foreach(string n in new[]{"Pupil_OD","Pupil_OS"}){var p=N(n);if(p)p.localScale=Vector3.Lerp(p.localScale,homeScale[n]*(session.prepared[8]?1.35f:1),Time.deltaTime*2);}
    // fixation: the distance chart, or the examiner's open eye while measuring PD
    Vector3 fix=new Vector3(0,1.5f,-1.5f);
@@ -584,6 +584,7 @@ namespace RefractionRoom {
    Toast("工作距離 "+session.wdCm+" cm ＝ "+Optics.WD(session.wdCm).ToString("0.00")+" D（檢影後從兩眼球面扣除）");MarkSave();
   }
   public void WorkingDistance(){ShiftWD(1);}
+  public void SetWD(float cm){int k=System.Array.IndexOf(WDOptions,cm);if(k<0)return;int cur=0;float best=999;for(int i=0;i<WDOptions.Length;i++){float d=Mathf.Abs(WDOptions[i]-session.wdCm);if(d<best){best=d;cur=i;}}if(k!=cur)ShiftWD(k-cur);else Toast("工作距離 "+cm+" cm ＝ "+Optics.WD(cm).ToString("0.00")+" D");}
   public void RemoveWD(){if(busy)return;if(session.wdRemoved){Toast("已扣除工作距離，避免重複扣除。");return;}StartCoroutine(Action("knob:Sph_OD",()=>{float wd=Optics.WD(session.wdCm);foreach(var h in session.eyes){Rx r=h.lens;r.s-=wd;h.lens=r;}session.wdRemoved=true;session.Log("雙眼扣 WD "+wd);SyncMechanics();Toast("雙眼球面各扣 "+wd.ToString("0.00")+"D；柱面與軸不變。");}));}
   public void Ask(){
    if(busy||!focused)return;

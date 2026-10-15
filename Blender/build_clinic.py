@@ -52,6 +52,10 @@ M={
  'RulerWhite':mat('RulerWhite',(.96,.96,.93),0,.25), 'Bottle':mat('Bottle',(.86,.92,.95),0,.15),
 }
 group=None
+def descendants(o):
+    r=[o]
+    for c in o.children:r.extend(descendants(c))
+    return r
 def finish(o,name,ma,parent=None,smooth=True):
     o.name=name; o.data.materials.clear();o.data.materials.append(M[ma]);
     for p in o.data.polygons:p.use_smooth=smooth
@@ -291,162 +295,12 @@ link('FootrestStrut',(0,.40,4.45),(0,.22,4.12),.02,'Chrome')
 box('Footrest',(0,.20,4.06),(.50,.04,.29),'Graphite',.012)
 for i in range(6):box('FootrestRib',(0,.222,3.95+i*.045),(.46,.006,.012),'Rubber',.002)
 
+for o in descendants(group)[1:]:
+    if o.location.z>.12:o.location.z-=.07
 # ================= Patient =================
-# Seated adult facing -Z. Head is one continuous sculpted surface; features are displacements.
-group=root('Patient',(0,0,4.55))
+# The seated patient is generated from MakeHuman CC0 assets by build_people.py (run it after this script).
+# Reference eye geometry shared with the refractor and tools (pupil plane 6 m from the chart).
 EYE_X=.032;EYE_Y=1.445;PUPIL_Z=4.475;EYE_CZ=4.4865;EYE_R=.0115
-HC=Vector((0,1.452,4.565))   # head centre (W = forward toward -Z)
-def G(X,Y,x0,y0,sx,sy,a):return a*math.exp(-((X-x0)/sx)**2-((Y-y0)/sy)**2)
-def nose_profile(Y):
-    # forward projection along the midline: root, dorsum, tip, columella
-    pts=[(.012,0),(.003,.0042),(-.012,.0088),(-.027,.0150),(-.037,.0190),(-.044,.0158),(-.051,.0085),(-.058,.0025),(-.064,.0)]
-    if Y>=pts[0][0] or Y<=pts[-1][0]:return 0.0
-    for (y0,a0),(y1,a1) in zip(pts,pts[1:]):
-        if y1<=Y<=y0:t=(Y-y0)/(y1-y0);t=t*t*(3-2*t);return a0+(a1-a0)*t
-    return 0.0
-def head_point(theta,phi):
-    dy=math.cos(theta);h=math.sin(theta);c=math.cos(phi);s=math.sin(phi)
-    front=s>0;n=2.45 if front else 2.15
-    f=(abs(c)**n+abs(s)**n)**(-1/n)   # smooth superellipse radius (no midline crease)
-    cx=c*f;cw=s*f
-    Y=dy*(.122 if dy>0 else .109)
-    hp=h**(.7 if dy>0 else .42) if front else h
-    X=.0735*h*cx;W=hp*cw*(.097 if front else .104)
-    if W<0 and Y>0:W*=1+.08*(Y/.122)
-    t=smoothstep(-.015,-.112,Y)
-    X*=1-.27*t-.10*t*t
-    X+=math.copysign(.004,X)*smoothstep(0,.03,abs(X))*math.exp(-((Y+.075)/.02)**2)*smoothstep(-.02,.03,W)   # mandible angle
-    W*=(1-.48*t) if W<0 else (1-.08*t)
-    # temples and cheek planes
-    X-=math.copysign(.0045,X)*smoothstep(0,.035,abs(X))*math.exp(-((Y-.035)/.03)**2)*smoothstep(0,.05,W)
-    X+=math.copysign(.003,X)*smoothstep(0,.035,abs(X))*math.exp(-((Y+.035)/.025)**2)*smoothstep(0,.06,W)
-    wf=smoothstep(.03,.072,W)
-    if wf>0:
-        d=0.0
-        for sx in (-1,1):
-            d+=G(X,Y,sx*EYE_X,-.006,.0165,.011,-.0052)+G(X,Y,sx*EYE_X,-.003,.028,.022,-.0014)
-            d+=G(X,Y,sx*.030,.0145,.028,.0075,.0030)            # soft brow ridge
-            d+=G(X,Y,sx*.045,-.028,.022,.018,.0036)             # cheekbone
-            d+=G(X,Y,sx*.036,-.050,.017,.015,.0030)             # full cheeks (relaxed smile)
-            d+=G(X,Y,sx*.0155,-.047,.0068,.0058,.0072)          # alar wings
-            d+=G(X,Y,sx*.023,-.0665,.006,.004,.0011)            # lifted mouth corners
-        d+=.86*nose_profile(Y)*math.exp(-(X/(.0075+.004*smoothstep(0,-.04,Y)))**2)
-        d+=G(X,Y,0,-.0625,.021,.0062,.0048)+G(X,Y,0,-.0755,.018,.0058,.0046)   # lips
-        d+=G(X,Y,0,-.0688,.024,.0015,-.0024)+G(X,Y,0,-.057,.0035,.0055,-.0006)  # stomion, philtrum
-        d+=G(X,Y,0,-.092,.022,.016,.017)+G(X,Y,0,-.083,.016,.005,-.0024)        # chin, mentolabial sulcus
-        W+=d*wf
-    return Vector((HC.x+X,HC.y+Y,HC.z-W))
-head=pivot('HeadPivot',(0,1.31,4.56),group)
-RINGS,SEGS=110,150
-hverts=[tuple(HC+Vector((0,.122,0)))];grid={}
-for i in range(1,RINGS):
-    th=i*math.pi/RINGS
-    for j in range(SEGS):
-        grid[(i,j)]=len(hverts);hverts.append(tuple(head_point(th,j*math.tau/SEGS)))
-bottom=len(hverts);hverts.append(tuple(head_point(math.pi*.999,math.pi/2)))
-hfaces=[]
-for j in range(SEGS):hfaces.append((0,grid[(1,(j+1)%SEGS)],grid[(1,j)]))
-for i in range(1,RINGS-1):
-    for j in range(SEGS):hfaces.append((grid[(i,j)],grid[(i,(j+1)%SEGS)],grid[(i+1,(j+1)%SEGS)],grid[(i+1,j)]))
-for j in range(SEGS):hfaces.append((bottom,grid[(RINGS-1,j)],grid[(RINGS-1,(j+1)%SEGS)]))
-headobj=new_mesh('Head',hverts,hfaces,'Skin',head,closed=True)
-# vertex normals in Unity space for overlay patches
-headobj.data.update()
-hnorm=[Vector((vv.normal.x,vv.normal.z,vv.normal.y)) for vv in headobj.data.vertices]
-def local(p):p=Vector(p);return p.x-HC.x,p.y-HC.y,HC.z-p.z
-def patch(name,ma,region,thickness,parent,ramp=.012,sink=.0015):
-    """Overlay shell (hair, brows, lips). region returns a signed margin in metres (inside > 0).
-    Outside the region the shell sinks below the skin, so the visible border is the smooth
-    intersection curve instead of a stair-stepped face boundary."""
-    keep={};verts=[]
-    for idx,p in enumerate(hverts):
-        X,Y,W=local(p);m=region(X,Y,W)
-        if m>-.006:
-            off=thickness(X,Y,W)*smoothstep(0,ramp,m) if m>0 else -sink*smoothstep(0,.004,-m)
-            keep[idx]=len(verts);verts.append(tuple(Vector(p)+hnorm[idx]*off))
-    faces=[tuple(keep[k] for k in f) for f in hfaces if all(k in keep for k in f)]
-    return new_mesh(name,verts,faces,ma,parent,outward=('from',tuple(HC)))
-def hairline(X,Y,W):
-    ax=abs(X)
-    if W>0:edge=.062-.03*(ax/.07)**2-.012*smoothstep(.02,.06,W)*(ax>.045)
-    else:edge=.012-.09*smoothstep(0,-.06,W)
-    edge=min(edge,.064)
-    if W>-.01 and ax>.058:edge=max(edge,.018)   # above the ears
-    return Y-edge
-patch('HairCap','Hair',hairline,lambda X,Y,W:.0065+.0075*smoothstep(.0,.09,Y)+.004*smoothstep(0,-.08,W),head)
-# soft fringe: strands laid on the forehead, swept to the patient's left
-def surf(X,Y,off):
-    best=None
-    for idx,p in enumerate(hverts):
-        lx,ly,lw=local(p)
-        if lw<.02:continue
-        d=(lx-X)**2+(ly-Y)**2
-        if best is None or d<best[0]:best=(d,idx)
-    return tuple(Vector(hverts[best[1]])+hnorm[best[1]]*off)
-for i in range(11):
-    x0=-.058+i*.0105;th=.0042+.0007*math.sin(i*1.7)
-    pts=[surf(x0,.074,.009),surf(x0+.012,.063,.0058),surf(x0+.021,.054,.0034),surf(x0+.027,.0485+.003*math.sin(i),.0017)]
-    curve('Fringe',pts,th,'Hair',head)
-for s in (-1,1):
-    def brow(X,Y,W,s=s):
-        if W<.04:return -1
-        u=(s*X-.012)/.044;uc=max(0,min(1,u))
-        yc=.0195+.0055*math.sin(uc*math.pi*.9)-.004*uc;half=.0027*(1-.55*uc)+.0007
-        return min(half-abs(Y-yc),.25*.044*min(u,1-u)+.0006)
-    patch('Brow','Brow',brow,lambda X,Y,W:.0011,head,ramp=.0018,sink=.0008)
-patch('Lips','Lip',lambda X,Y,W:-1 if W<.06 else .004*(1-((X/.0215)**2+((Y+.0688)/.0110)**2)),lambda X,Y,W:.0009,head,ramp=.0025,sink=.0008)
-mouth=pivot('MouthPivot',(0,1.3832,4.4740),head)
-ell('MouthOpening',(0,1.3832,4.4732),(.0140,.00035,.0010),'Pupil',mouth)
-for s in (-1,1):
-    x=s*EYE_X
-    rig=pivot('EyeRig_OD' if s<0 else 'EyeRig_OS',(x,EYE_Y,EYE_CZ),head)
-    eye=pivot('Eye_OD' if s<0 else 'Eye_OS',(x,EYE_Y,EYE_CZ),rig)
-    sc=ell('Sclera',(x,EYE_Y,EYE_CZ),(EYE_R*1.06,EYE_R,EYE_R),'Sclera',eye,32,24)
-    cyl('Iris',(x,EYE_Y,PUPIL_Z+.0011),.0061,.0007,'Iris','Z',eye,48,False)
-    ring('Limbus',(x,EYE_Y,PUPIL_Z+.0012),.0061,.0004,'Brow',eye)
-    cyl('Pupil_OD' if s<0 else 'Pupil_OS',(x,EYE_Y,PUPIL_Z+.0002),.0021,.0004,'Pupil','Z',eye,32,False)
-    ell('Catchlight',(x-.0021,EYE_Y+.0022,PUPIL_Z-.0004),(.0012,.0012,.0003),'White',rig,10,8)
-    # Eyelids are spherical shells over the globe; the upper lid pivots on the eye centre to blink.
-    # Eyelids: spherical shells over the globe whose free margins arch (almond fissure).
-    RR=.01245;NA,NB=20,44
-    for upper in (True,False):
-        nm=('Lid_OD' if s<0 else 'Lid_OS') if upper else 'LowerLid'
-        lp=pivot(nm,(x,EYE_Y,EYE_CZ),rig) if upper else rig
-        lv=[];lf=[];margin=[]
-        for ib in range(NB+1):
-            ph=math.pi*(.06+.88*ib/NB);k=math.cos(ph)**2
-            ye=(.0037-.0043*k) if upper else (-.0050+.0042*k)
-            te=math.acos(max(-1,min(1,ye/RR)))
-            t0,t1=(math.radians(6),te) if upper else (te,math.radians(174))
-            for ia in range(NA+1):
-                th=t0+(t1-t0)*ia/NA
-                lv.append((x-RR*1.2*math.sin(th)*math.cos(ph),EYE_Y+RR*math.cos(th),EYE_CZ-RR*math.sin(th)*math.sin(ph)))
-            margin.append((x-RR*1.215*math.sin(te)*math.cos(ph),EYE_Y+RR*math.cos(te),EYE_CZ-RR*1.012*math.sin(te)*math.sin(ph)))
-        for ib in range(NB):
-            for ia in range(NA):a2=ib*(NA+1)+ia;lf.append((a2,a2+1,a2+NA+2,a2+NA+1))
-        new_mesh('UpperLidSkin' if upper else 'LidShell',lv,lf,'Skin',lp,outward=('from',(x,EYE_Y,EYE_CZ)))
-        curve('LashLine' if upper else 'LowerLidMargin',margin[3:-3:4],.0006 if upper else .00022,'Hair' if upper else 'SkinShade',lp)
-    ear=pivot('Ear',(s*.0715,1.440,4.572),head)
-    ell('EarShell',(s*.0745,1.440,4.575),(.0075,.029,.017),'Skin',ear,24,16)
-    ell('EarConcha',(s*.079,1.437,4.572),(.0032,.016,.009),'SkinShade',ear,16,12)
-    curve('EarHelix',[(s*.078,1.418,4.568),(s*.081,1.452,4.566),(s*.079,1.466,4.578),(s*.077,1.456,4.592)],.0028,'Skin',ear)
-tube('Neck',[(0,1.20,4.680),(0,1.30,4.632),(0,1.385,4.605)],[(.050,.048),(.045,.044),(.043,.042)],'Skin',group,seg=28,sub=5,caps=(False,False),up=(0,0,1))
-tube('Torso',[(0,.735,4.74),(0,.90,4.75),(0,1.07,4.735),(0,1.19,4.705),(0,1.262,4.68)],
-     [(.168,.118),(.150,.104),(.172,.112),(.162,.094),(.080,.066)],'Shirt',group,seg=40,sub=6,up=(0,0,1))
-ring('Collar',(0,1.272,4.655),.050,.011,'ShirtSeam',group,axis='Y')
-for s in (-1,1):
-    tube('Sleeve',[(s*.05,1.255,4.70),(s*.165,1.225,4.70),(s*.205,1.145,4.705),(s*.222,.965,4.695),(s*.175,.875,4.555),(s*.152,.858,4.475)],
-         [.047,.056,.051,.041,.034,.029],'Shirt',group,seg=24,sub=6)
-    tube('Cuff',[(s*.156,.861,4.49),(s*.151,.857,4.468)],[.031,.030],'ShirtSeam',group,seg=24,sub=2)
-    tube('PatientHand',[(s*.150,.857,4.47),(s*.143,.852,4.43),(s*.137,.849,4.392)],[(.022,.011),(.036,.012),(.038,.011)],'Skin',group,seg=20,sub=4,up=(0,1,0))
-    for f,dx in enumerate((-.024,-.008,.008,.023)):
-        xx=s*.137+(-s)*dx;L=[.044,.050,.047,.038][f]
-        tube('PatientFinger',[(xx,.850,4.394),(xx,.846,4.394-L*.55),(xx,.834,4.394-L)],[.0083,.0077,.0066],'Skin',group,seg=12,sub=3)
-    tube('PatientThumb',[(s*.118,.853,4.455),(s*.106,.849,4.428),(s*.103,.846,4.408)],[.0105,.0092,.0080],'Skin',group,seg=12,sub=3)
-    tube('Thigh',[(s*.095,.768,4.73),(s*.103,.763,4.47),(s*.110,.748,4.30)],[.086,.074,.058],'Trousers',group,seg=32,sub=6)
-    tube('LowerLeg',[(s*.110,.745,4.29),(s*.113,.52,4.25),(s*.115,.31,4.225)],[.056,.049,.037],'Trousers',group,seg=28,sub=6)
-    tube('Shoe',[(s*.115,.262,4.27),(s*.117,.258,4.15),(s*.120,.250,4.02)],[(.040,.036),(.044,.035),(.036,.022)],'Shoe',group,seg=24,sub=6)
-    tube('ShoeSole',[(s*.115,.230,4.285),(s*.120,.230,4.005)],[(.040,.007),(.036,.007)],'Rubber',group,seg=20,sub=2)
 
 # ================= Refraction stand =================
 group=root('PhoropterStand',(.62,0,4.425))
@@ -672,7 +526,7 @@ group=root('ClinicianHands',(0,0,0))
 for side,sgn in [('R',1),('L',-1)]:
     wrist=pivot('Hand_'+side,(sgn*.22,-.30,.44),group)
     tube('Sleeve_'+side,[(sgn*.33,-.52,.12),(sgn*.27,-.40,.30),(sgn*.236,-.322,.386)],[.054,.048,.043],'CoatWhite',wrist,seg=24,sub=4)
-    tube('GloveCuff_'+side,[(sgn*.240,-.326,.374),(sgn*.226,-.309,.404)],[.036,.034],'Glove',wrist,seg=24,sub=2)
+    tube('GloveCuff_'+side,[(sgn*.238,-.324,.372),(sgn*.225,-.308,.400)],[.031,.025],'Glove',wrist,seg=24,sub=2,caps=(False,True),cap_rings=2)
     tube('Palm_'+side,[(sgn*.225,-.307,.398),(sgn*.221,-.301,.432),(sgn*.216,-.298,.468)],[(.031,.014),(.040,.016),(.042,.013)],'Glove',wrist,seg=24,sub=4,up=(0,1,0))
     for f,(dx,L) in enumerate([(-.025,.047),(-.0085,.053),(.0085,.050),(.024,.041)]):
         xx=sgn*(.216+dx);zz=.466
@@ -684,14 +538,10 @@ for side,sgn in [('R',1),('L',-1)]:
 scene=bpy.context.scene;scene.unit_settings.system='METRIC';scene.unit_settings.scale_length=1
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT,'Blender','RefractionRoom.blend'))
 roots=[o for o in bpy.data.objects if o.parent is None]
-def descendants(o):
-    r=[o]
-    for c in o.children:r.extend(descendants(c))
-    return r
 manifest=[]
 for name in os.listdir(OUT):
     if name.endswith('.clinicmesh.json') or name.endswith('.fbx'):
-        if name.split('.')[0] not in [r.name for r in roots]:os.remove(os.path.join(OUT,name))
+        if name.split('.')[0] not in [r.name for r in roots]+['Patient']:os.remove(os.path.join(OUT,name))
 for root_obj in roots:
     bpy.ops.object.select_all(action='DESELECT')
     for o in descendants(root_obj):o.select_set(True)

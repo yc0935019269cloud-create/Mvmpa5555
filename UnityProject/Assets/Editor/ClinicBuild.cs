@@ -12,20 +12,37 @@ using RefractionRoom;
 
 public static class ClinicBuild {
  [Serializable] class MeshPackage {public string name;public MeshNode[] nodes;}
- [Serializable] class MeshNode {public string name,material;public int parent;public float[] position,vertices,uv,color;public int[] triangles;public float metallic,roughness;}
+ [Serializable] class MeshNode {public string name,material,texture;public int parent;public float[] position,vertices,uv,color,normals,boneWeight;public int[] triangles,bones,boneIndex;public float metallic,roughness,cutout;}
  static GameObject ImportBlender(string name){
   Directory.CreateDirectory("Assets/Generated/Meshes");Directory.CreateDirectory("Assets/Generated/Materials");
   var pack=JsonUtility.FromJson<MeshPackage>(File.ReadAllText("Assets/Models/"+name+".clinicmesh.json"));var objects=new List<GameObject>();
+  for(int k=0;k<pack.nodes.Length;k++){var n=pack.nodes[k];var g=new GameObject(n.name);objects.Add(g);if(n.parent>=0)g.transform.SetParent(objects[n.parent].transform,false);g.transform.localPosition=new Vector3(n.position[0],n.position[1],n.position[2]);}
   for(int k=0;k<pack.nodes.Length;k++){
-   var n=pack.nodes[k];var g=new GameObject(n.name);objects.Add(g);if(n.parent>=0)g.transform.SetParent(objects[n.parent].transform,false);g.transform.localPosition=new Vector3(n.position[0],n.position[1],n.position[2]);
+   var n=pack.nodes[k];var g=objects[k];
    if(n.vertices.Length==0)continue;
-   var mesh=new Mesh();mesh.name=name+"_"+n.name;mesh.indexFormat=n.vertices.Length/3>65535?IndexFormat.UInt32:IndexFormat.UInt16;var verts=new Vector3[n.vertices.Length/3];var uv=new Vector2[verts.Length];for(int i=0;i<verts.Length;i++){verts[i]=new Vector3(n.vertices[i*3],n.vertices[i*3+1],n.vertices[i*3+2]);uv[i]=new Vector2(n.uv[i*2],n.uv[i*2+1]);}mesh.vertices=verts;mesh.triangles=n.triangles;mesh.uv=uv;mesh.RecalculateNormals();mesh.RecalculateBounds();
+   var mesh=new Mesh();mesh.name=name+"_"+n.name;mesh.indexFormat=n.vertices.Length/3>65535?IndexFormat.UInt32:IndexFormat.UInt16;var verts=new Vector3[n.vertices.Length/3];var uv=new Vector2[verts.Length];for(int i=0;i<verts.Length;i++){verts[i]=new Vector3(n.vertices[i*3],n.vertices[i*3+1],n.vertices[i*3+2]);uv[i]=new Vector2(n.uv[i*2],n.uv[i*2+1]);}mesh.vertices=verts;mesh.triangles=n.triangles;mesh.uv=uv;
+   if(n.normals!=null&&n.normals.Length==n.vertices.Length){var nr=new Vector3[verts.Length];for(int i=0;i<nr.Length;i++)nr[i]=new Vector3(n.normals[i*3],n.normals[i*3+1],n.normals[i*3+2]);mesh.normals=nr;}else mesh.RecalculateNormals();
+   bool skinned=n.bones!=null&&n.bones.Length>0;Transform[] bones=null;
+   if(skinned){bones=n.bones.Select(b=>objects[b].transform).ToArray();var bw=new BoneWeight[verts.Length];for(int i=0;i<bw.Length;i++){int o=i*4;bw[i]=new BoneWeight{boneIndex0=n.boneIndex[o],weight0=n.boneWeight[o],boneIndex1=n.boneIndex[o+1],weight1=n.boneWeight[o+1],boneIndex2=n.boneIndex[o+2],weight2=n.boneWeight[o+2],boneIndex3=n.boneIndex[o+3],weight3=n.boneWeight[o+3]};}mesh.boneWeights=bw;
+    // bind pose = exported pose: every pivot's frame relative to this mesh's frame
+    mesh.bindposes=bones.Select(b=>b.worldToLocalMatrix*g.transform.localToWorldMatrix).ToArray();}
+   mesh.RecalculateBounds();if(mesh.normals.Length>0)mesh.RecalculateTangents();
    string mp="Assets/Generated/Meshes/"+name+"_"+k+".asset";Mesh old=AssetDatabase.LoadAssetAtPath<Mesh>(mp);if(old){EditorUtility.CopySerialized(mesh,old);UnityEngine.Object.DestroyImmediate(mesh);mesh=old;}else AssetDatabase.CreateAsset(mesh,mp);
-   string matp="Assets/Generated/Materials/"+n.material+".mat";var mat=AssetDatabase.LoadAssetAtPath<Material>(matp);if(!mat){mat=new Material(Shader.Find("Standard"));AssetDatabase.CreateAsset(mat,matp);}mat.color=new Color(n.color[0],n.color[1],n.color[2],n.material=="Glass"?.14f:1);mat.SetFloat("_Metallic",n.metallic);mat.SetFloat("_Glossiness",Mathf.Clamp(1-n.roughness,0,.97f));if(n.material=="Glass")Transparent(mat);EditorUtility.SetDirty(mat);
-   g.AddComponent<MeshFilter>().sharedMesh=mesh;g.AddComponent<MeshRenderer>().sharedMaterial=mat;
+   string matp="Assets/Generated/Materials/"+n.material+".mat";var mat=AssetDatabase.LoadAssetAtPath<Material>(matp);if(!mat){mat=new Material(Shader.Find("Standard"));AssetDatabase.CreateAsset(mat,matp);}mat.color=new Color(n.color[0],n.color[1],n.color[2],n.material=="Glass"?.14f:1);mat.SetFloat("_Metallic",n.metallic);mat.SetFloat("_Glossiness",Mathf.Clamp(1-n.roughness,0,.97f));if(n.material=="Glass")Transparent(mat);
+   if(!string.IsNullOrEmpty(n.texture)){mat.mainTexture=LoadTexture("Assets/Models/"+n.texture,n.cutout>0);if(n.cutout>0)Cutout(mat,n.cutout);}
+   EditorUtility.SetDirty(mat);
+   if(skinned){var smr=g.AddComponent<SkinnedMeshRenderer>();smr.sharedMesh=mesh;smr.bones=bones;smr.rootBone=objects[0].transform;smr.sharedMaterial=mat;smr.updateWhenOffscreen=true;smr.quality=SkinQuality.Bone4;}
+   else{g.AddComponent<MeshFilter>().sharedMesh=mesh;g.AddComponent<MeshRenderer>().sharedMaterial=mat;}
   }
   return objects[0];
  }
+ // MakeHuman CC0 textures: capped at 1024 px for the WebGL download, alpha kept for hair, brows and lashes
+ static Texture2D LoadTexture(string path,bool alpha){
+  var ti=AssetImporter.GetAtPath(path) as TextureImporter;
+  if(ti){bool dirty=ti.maxTextureSize!=1024||ti.alphaIsTransparency!=alpha||ti.mipmapEnabled!=true;ti.maxTextureSize=1024;ti.alphaIsTransparency=alpha;ti.mipmapEnabled=true;ti.sRGBTexture=true;if(dirty)ti.SaveAndReimport();}
+  return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+ }
+ static void Cutout(Material m,float c){m.SetFloat("_Mode",1);m.SetOverrideTag("RenderType","TransparentCutout");m.SetInt("_SrcBlend",(int)BlendMode.One);m.SetInt("_DstBlend",(int)BlendMode.Zero);m.SetInt("_ZWrite",1);m.EnableKeyword("_ALPHATEST_ON");m.DisableKeyword("_ALPHABLEND_ON");m.DisableKeyword("_ALPHAPREMULTIPLY_ON");m.SetFloat("_Cutoff",c);m.renderQueue=2450;}
  static void Transparent(Material m){m.SetFloat("_Mode",3);m.SetOverrideTag("RenderType","Transparent");m.SetInt("_SrcBlend",(int)BlendMode.One);m.SetInt("_DstBlend",(int)BlendMode.OneMinusSrcAlpha);m.SetInt("_ZWrite",0);m.DisableKeyword("_ALPHATEST_ON");m.DisableKeyword("_ALPHABLEND_ON");m.EnableKeyword("_ALPHAPREMULTIPLY_ON");m.renderQueue=3000;}
  static string Root {get{return Directory.GetParent(Application.dataPath).Parent.FullName;}}
  static int checks;

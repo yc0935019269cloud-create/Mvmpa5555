@@ -45,3 +45,9 @@
 - 本機 Chrome 內建瀏覽器 `?qa=1` 完整自動流程：消毒動畫→PD 對應邊緣法（記錄 64 mm）→9 項準備→雙眼檢影、WD、VA/PH、霧視 MPMVA、紅綠、JCC APA/PPAP、第二次 MPMVA，最終 `completed=true / missing=0`。
 - 以截圖人工檢查：驗光儀正面朝檢查者、背面面罩/額托朝受測者；PD 尺在鼻樑前、刻度可讀；消毒動畫雙手持噴瓶與棉布、擦額托與面罩；檢影窺孔顯示瞳孔反射。
 - 限制：人物仍為風格化程式建模，非照片擬真；動作為程式動畫非動作捕捉。尚未推送與公開站驗收。
+
+## 2026-10-16 MPFB 人物替換
+
+- 病人與第一人稱雙手改用 MakeHuman CC0 素材（MPFB 2.0.18 產生，工具本身不入庫），眼睛保留自製程序眼。
+- ClinicBuild.Validate 249 項 PASS；Unity 6000.6.5f1 WebGL 建置 Succeeded、Errors 0；`node tools/verify-site.mjs` 通過。
+- 本機瀏覽器 `?qa=1`：完整期中流程 PASS_FULL_MIDTERM_FLOW、missing=0、PD 64 mm；工作距離頂部選單可選並更新 D 值。
