@@ -46,8 +46,8 @@ namespace RefractionRoom {
    Txt("intro",card.transform,"走進診間，完成一次驗光。\n拿起工具、觀察反射、調整鏡片，\n聽見受測者眼中的清晰與模糊。",0,83,550,130,23,pale,new Vector2(.5f,.5f));
    Txt("scope",card.transform,"期中範圍 · 檢影 / 單眼自覺式驗光 / JCC\n不包含鐘面圖與期末項目",0,-12,550,64,18,muted,new Vector2(.5f,.5f));
    patientChoice=Txt("case",card.transform,"病例 01  /  林同學",0,-83,330,45,22,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
-   Btn("previous case",card.transform,"−",-226,-83,52,44,()=>{selectedPatient=selectedPatient==1?6:selectedPatient-1;CaseLabel();});
-   Btn("next case",card.transform,"+",226,-83,52,44,()=>{selectedPatient=selectedPatient%6+1;CaseLabel();});
+   Btn("previous case",card.transform,"−",-226,-83,52,44,()=>{selectedPatient=selectedPatient==0?6:selectedPatient-1;CaseLabel();});
+   Btn("next case",card.transform,"+",226,-83,52,44,()=>{selectedPatient=selectedPatient==6?0:selectedPatient+1;CaseLabel();});
    Btn("tutorial",card.transform,"進入診間  /  教學",0,-152,550,58,()=>world.Begin("教學"),true);
    Btn("free",card.transform,"自由練習",-142,-218,266,50,()=>world.Begin("自由"));
    Btn("exam",card.transform,"期中考試 · 18 分鐘",142,-218,266,50,()=>{hints=false;world.Begin("考試");});
@@ -221,13 +221,13 @@ namespace RefractionRoom {
   }
   Sprite RemoteShape(){int n=64,r=12;var tex=new Texture2D(n,n,TextureFormat.RGBA32,false);for(int y=0;y<n;y++)for(int x=0;x<n;x++){float dx=Mathf.Max(r-x,0,x-(n-1-r)),dy=Mathf.Max(r-y,0,y-(n-1-r));tex.SetPixel(x,y,new Color(1,1,1,Mathf.Clamp01(r-Mathf.Sqrt(dx*dx+dy*dy))));}tex.Apply();return Sprite.Create(tex,new UnityEngine.Rect(0,0,n,n),new Vector2(.5f,.5f),100,0,SpriteMeshType.FullRect,new Vector4(r,r,r,r));}
   void Place(string n,float x,float y){((RectTransform)station.transform.Find(n)).anchoredPosition=new Vector2(x,y);}
-  void CaseLabel(){var s=new ClinicSession();s.patient=selectedPatient;patientChoice.text="病例 "+selectedPatient.ToString("00")+"  /  "+s.PatientName;}
+  void CaseLabel(){if(selectedPatient==0){patientChoice.text="隨機病患（19–21 歲）";return;}var s=new ClinicSession();s.patient=selectedPatient;patientChoice.text="病例 "+selectedPatient.ToString("00")+"  /  "+s.PatientName;}
   public void Refresh(){if(!world||!root)return;scaler.matchWidthOrHeight=Screen.height>0&&(float)Screen.width/Screen.height<1.7f?0:1;var s=world.session;bool play=world.begun;hud.SetActive(play);book.SetActive(play&&world.notebook);pausedPanel.SetActive(play&&world.paused);resume.interactable=canResume;
    if(!world.paused&&abandonConfirm)abandonConfirm.SetActive(false);if(volumeLabel)volumeLabel.text="背景音樂音量  "+Mathf.RoundToInt(world.musicVolume*100)+"%";
    if(!play)return;
    task.text=s.StageTitle;step.text="STEP "+(s.stage+1).ToString("00")+" / 17  ·  "+s.mode;
    task.transform.parent.gameObject.SetActive(!immersive&&!world.cinematic);
-   patient.text=s.PatientName+" · 病例 "+s.patient.ToString("00")+" · "+s.EyeName;
+   patient.text=s.PatientName+(s.patient==0?"":" · 病例 "+s.patient.ToString("00"))+" · "+s.EyeName;
    string wdLabel=s.wdCm+" cm · "+Optics.WD(s.wdCm).ToString("0.00")+" D";if(wdPrepText)wdPrepText.text=wdLabel;if(wdChip){wdChip.GetComponentInChildren<Text>().text="工作距離 "+s.wdCm+" cm";foreach(var b in wdOpts){bool on=b.name=="wd opt "+s.wdCm;b.GetComponent<Image>().color=on?accent:lighter;b.GetComponentInChildren<Text>().color=on?dark:pale;}if(wdHint)wdHint.text=s.wdRemoved?"已從兩眼扣除工作距離，要改請重新開始病例":"目前 "+wdLabel+"，檢影後從兩眼球面扣除";}if(wdText)wdText.text=s.wdCm+"cm";
    int sec=Mathf.FloorToInt(s.mode=="考試"?Mathf.Max(0,1080-s.seconds):s.seconds);clock.text=(s.mode=="考試"?"剩餘 ":"練習 ")+string.Format("{0:00}:{1:00}",sec/60,sec%60)+"  /  六公尺視標";
    var missing=s.Missing();mission.text=s.mode=="考試"?"依期中檢查流程獨立操作。\n完成時按 Enter 前往下一階段。":missing.Count==0?"✓ 這一步的條件已完成。\n按 Enter 前往下一步。":string.Join("\n",missing.GetRange(0,Mathf.Min(4,missing.Count)).ConvertAll(x=>"・"+x));

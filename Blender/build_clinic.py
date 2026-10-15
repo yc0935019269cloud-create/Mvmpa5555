@@ -209,6 +209,16 @@ def disc(name,c,r,z0,z1,ma,parent=None,knurl=0,inner=0,bevel=.0005,n=None):
     """Front-facing turned part: plain or knurled cylinder, or annulus when inner>0 (axis Z)."""
     n=n or (knurl*2 if knurl else 64)
     return slab(name,circle_pts(c[0],c[1],r,n,knurl,.0007 if knurl else 0),z0,z1,ma,parent,bevel,2,((c[0],c[1],inner),) if inner else ())
+def glyph(name,text,c,z,size,ma,parent=None,rot=0.0):
+    """Flat engraved letters facing the examiner (-Z in Unity) centred on c=(x,y) at depth z."""
+    cu=bpy.data.curves.new(name,'FONT');cu.body=text;cu.align_x='CENTER';cu.align_y='CENTER';cu.size=size;cu.extrude=.00012
+    o=bpy.data.objects.new(name,cu);bpy.context.collection.objects.link(o)
+    o.rotation_euler=(math.pi/2,0,0);bpy.context.view_layer.update()
+    bpy.context.view_layer.objects.active=o;o.select_set(True);bpy.ops.object.convert(target='MESH');o=bpy.context.view_layer.objects.active;o.select_set(False)
+    o.rotation_mode='ZXY';o.rotation_euler=(math.pi/2,0,rot);o.location=v((c[0],c[1],z))   # spin in the text plane, then stand it up facing the examiner
+    bpy.context.view_layer.update();bpy.ops.object.select_all(action='DESELECT');o.select_set(True);bpy.context.view_layer.objects.active=o
+    bpy.ops.object.transform_apply(location=False,rotation=True,scale=True);o.select_set(False)
+    return finish(o,name,ma,parent,smooth=False)
 def flat_marks(name,quads,z,ma,parent=None):
     """Printed/engraved marks: single-sided quads facing the examiner (-Z)."""
     verts=[];faces=[]
@@ -439,6 +449,10 @@ def battery(eye,sgn):
     for side in (-1,1):
         cyl('JCCRollKnob',(jc[0]+side*.0215,jc[1],ZF-.0215),.0042,.009,'AluDark','X',cell,20)
         link('JCCRollAxle',(jc[0]+side*.0165,jc[1],ZF-.0215),(jc[0]+side*.0175,jc[1],ZF-.0215),.0018,'Alu',cell)
+    # ring markings: A where the handle (axis check) sits, P where the dots (power check) sit;
+    # whichever letter lines up with the cylinder axis tells which check is in place
+    for lab,deg in (('A',0),('A',180),('P',45),('P',225)):
+        r=math.radians(deg);glyph('JCCMark_'+lab,lab,(jc[0]+math.cos(r)*.01465,jc[1]+math.sin(r)*.01465),ZF-.02165,.0034,'Red' if lab=='P' else 'Black',cell,rot=r-math.pi/2)
     flip=pivot('JCCFlip_'+eye,(jc[0],jc[1],ZF-.0225),cell)
     disc('JCCLensRim',jc,.0135,ZF-.0255,ZF-.0195,'AluDark',flip,inner=.0118)
     disc('JCCLens',jc,.0119,ZF-.0228,ZF-.0222,'Glass',flip,bevel=0)

@@ -53,7 +53,7 @@ namespace RefractionRoom {
     w.Ask();yield return Wait();Next();
    }
    for(int e=0;e<2;e++){   // ③ JCC, recorded
-    while(w.session.Phase==3){w.Ask();yield return Wait();w.Ask();yield return Wait();Next();}
+    while(w.session.Phase==3){if(w.session.Searching){foreach(float a in ClinicSession.SearchAngles){w.session.H.searchAngle=a;w.Ask();yield return Wait();}}else{w.Ask();yield return Wait();w.Ask();yield return Wait();}Next();}
     w.Record();yield return Wait();Next();
    }
    for(int e=0;e<2;e++){   // ④ 2nd MPMVA

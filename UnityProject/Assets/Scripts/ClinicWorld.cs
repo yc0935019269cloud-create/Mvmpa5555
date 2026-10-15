@@ -298,7 +298,7 @@ namespace RefractionRoom {
    AnimatePatient();
    // Cross cylinder loupes are geared to the cylinder axis: handle on the axis (A) or red dots on it (P).
    var phoro=N("Phoropter");
-   for(int e=0;e<2;e++){var cell=N("JCCCell_"+EN[e]);if(!cell||!phoro)continue;float a=session.eyes[e].lens.a;bool power=session.jccMode==2&&e==session.eye;cell.rotation=phoro.rotation*Quaternion.Euler(0,0,power?a-45:a);}
+   for(int e=0;e<2;e++){var cell=N("JCCCell_"+EN[e]);if(!cell||!phoro)continue;float a=session.JCCRef(e);bool power=session.jccMode==2&&e==session.eye;cell.rotation=phoro.rotation*Quaternion.Euler(0,0,power?a-45:a);}
    HandPose(dt);
    Retinoscopy();
    for(int i=0;i<lit.Count;i++)if(lit[i])lit[i].SetPropertyBlock(null);lit.Clear();
@@ -490,7 +490,7 @@ namespace RefractionRoom {
   public void Begin(string mode){
    string mark="tools";
    try{
-    Time.timeScale=1;remoteOwned=false;projectorOn=true;jccDrag=-1;ReturnTools();held=0;mark="session";session=new ClinicSession();session.patient=ui.selectedPatient;session.mode=mode;session.wdCm=PlayerPrefs.GetFloat("ClinicWD",57);session.EnterStage();begun=true;paused=false;notebook=false;focused=false;patientView=false;pdStep=-1;cinematic=false;handScripted=false;
+    Time.timeScale=1;remoteOwned=false;projectorOn=true;jccDrag=-1;ReturnTools();held=0;mark="session";session=new ClinicSession();session.patient=ui.selectedPatient;if(session.patient==0)session.Randomize(System.Environment.TickCount);session.mode=mode;session.wdCm=PlayerPrefs.GetFloat("ClinicWD",57);session.EnterStage();begun=true;paused=false;notebook=false;focused=false;patientView=false;pdStep=-1;cinematic=false;handScripted=false;
     mark="camera";walkPos=new Vector3(.6f,1.65f,.3f);view.transform.position=walkPos;yaw=0;pitch=0;view.transform.rotation=Quaternion.identity;targetFov=66;hands.gameObject.SetActive(true);ui.menu.SetActive(false);
     mark="patient";ApplyPatient();mark="mechanics";SyncMechanics(true);mark="chart";DrawChart();mark="lock";Lock();mark="say";Say("您好，我看遠有點模糊，今天想檢查度數。",true);mark="save";SaveProgress();
    }catch(Exception ex){Debug.LogError("CLINIC_BEGIN_FAILED at "+mark+": "+ex);begun=true;ui.menu.SetActive(false);hands.gameObject.SetActive(true);}
@@ -563,6 +563,11 @@ namespace RefractionRoom {
   public void Row(int sign){int k=0;for(int i=0;i<Optics.Rows.Length;i++)if(Mathf.Abs(session.row-Optics.Rows[i])<.01f)k=i;k=Mathf.Clamp(k+sign,0,Optics.Rows.Length-1);session.row=Optics.Rows[k];DrawChart();audioOut.PlayOneShot(tick);}
   public void Fog(){if(busy)return;float amount=session.Phase==5?.5f:1;var e=session.eye;StartCoroutine(Action("knob:Sph_"+EN[e],()=>{Rx r=session.H.lens;r.s+=amount;session.H.lens=r;if(session.Phase==5)session.H.secondFogged=true;else session.H.fogged=true;session.H.highestFog=amount;session.Log("霧視 +"+amount.ToString("0.00")+"D");SyncMechanics();DrawChart();Toast("加 +"+amount.ToString("0.00")+" D 霧視；逐格退正並反覆確認視力。");SaveProgress();}));}
   public void CycleJCC(){if(busy)return;SetJCC((session.jccMode+1)%3);}
+  // What the answer means for the lens (tutorial/free modes): face 1 = red dot on the reference axis.
+  void JCCTeach(){if(session.mode=="考試")return;string a=session.AskJCC();bool first=a.StartsWith("第一"),same=a.StartsWith("兩片");
+   if(session.Searching){float ang=session.H.searchAngle;Toast("紅點在 "+ang.ToString("0")+"°："+(same?"兩面一樣 → 這方向沒有散光，轉下一個 45°":first?"選紅點（第一面）→ 接受這方向的負柱面：柱面加 −0.25、軸放 "+ang.ToString("0")+"°":"選白點（第二面）→ 拒絕這方向的負柱面，轉下一個 45°"));return;}
+   if(session.jccMode==2)Toast(same?"P：兩面一樣 → 柱面度數到位":first?"P：第一面（紅點對軸）較清楚 → 柱面加 −0.25（每 −0.50 柱面補 +0.25 球面）":"P：第二面（白點對軸）較清楚 → 柱面減少 0.25（往 + 方向）；柱面已是 0 時改查其他方向");
+   else if(session.jccMode==1)Toast(same?"A：兩面一樣 → 軸位到位":first?"A：第一面較清楚 → 追紅點：軸度數加大（+5°）":"A：第二面較清楚 → 追紅點：軸度數減小（−5°）");}
   void SetJCC(int mode){if(!session.phoropterIn){Toast("先把驗光儀轉到受測者眼前。");return;}StartCoroutine(Action("jcc-swing",()=>{session.jccMode=mode;SyncMechanics();Toast(new[]{"轉盤收回 JCC","JCC 轉入 · 軸位 A：滾輪手柄與柱面軸同向，紅白點在兩側 45°","JCC 轉 45° · 度數 P：紅點與柱面軸平行"}[mode]);}));}
   public void Streak(int sign){Reach(N("RetSleeve"));session.streak=Optics.Axis(session.streak+sign*15);if(session.streak>=180)session.streak=0;session.Log("光帶旋轉 "+session.streak);audioOut.PlayOneShot(tick,.6f);}
   public void Streak90(){Reach(N("RetSleeve"));session.streak=Optics.Axis(session.streak+90);if(session.streak>=180)session.streak=0;session.Log("光帶轉 90° → "+session.streak);audioOut.PlayOneShot(click,.5f);Toast("撥動套筒滾輪：光帶轉到 "+StreakName()+"，掃另一條主子午線。");}
@@ -591,7 +596,7 @@ namespace RefractionRoom {
    if(!session.occluded&&session.stage>=4){Toast("先把非測試眼的輔助鏡片轉到 OC，受測者才會只用測試眼比較。");return;}
    if(session.stage==1||session.stage==2){Sweep();return;}
    if(!projectorOn){Toast("請先開啟投影視標。");return;}
-   if(session.chart==1){StartCoroutine(Action("ask",()=>{session.H.duoAsked=true;Say(Optics.Duo(session.Truth(session.eye),session.H.lens),true);session.Log("紅綠問答");}));return;}
+   if(session.chart==1){StartCoroutine(Action("ask",()=>{session.H.duoAsked=true;string d=Optics.Duo(session.Truth(session.eye),session.H.lens);Say(d,true);if(session.mode!="考試")Toast(d.StartsWith("紅")?"紅色清楚 → 加 −0.25（加負）":"綠色清楚 → 若剛才還是紅色，這就是第一次綠色：停在這裡記錄；一開始就綠 → 加 +0.25 再問");session.Log("紅綠問答");}));return;}
    if(session.jccMode>0){StartCoroutine(CompareJCC());return;}
    StartCoroutine(Action("ask",()=>{session.Read();int n=session.H.lastLetters;int ri=Optics.RowIndex(session.row);string[] word={"右","上","左","下"};string s="";for(int i=0;i<5;i++)s+=(i<n?word[Optics.RowRot(ri,i)]:"看不清楚")+(i<4?"、":"。");Say("這一排："+s+(n<5?"後面有點糊。":""),true);
     float bv,lm;string lab=Optics.VALabel(session.row,n,out bv,out lm);if(session.mode!="考試")Toast("列 "+session.row.ToString("0.0")+" 讀對 "+n+"/5"+(lab!=""?" → 記為 "+lab:" → 這列讀不到，換大一列")+"（3–4 個記「該列 −錯幾個」，1–2 個記「上一列 +讀對幾個」）");SaveProgress();}));
@@ -600,7 +605,7 @@ namespace RefractionRoom {
   IEnumerator FlipOnce(){busy=true;int e=session.eye;var t=N("JCCFlip_"+EN[e]);jccFace[e]=!jccFace[e];Reach(N("JCCCell_"+EN[e]));
    if(t)DriveTo(t,homePos[t.name],homeRot[t.name]*Quaternion.AngleAxis(jccFace[e]?180:0,Vector3.right),false,14);
    audioOut.PlayOneShot(click,.5f);yield return new WaitForSeconds(.28f);
-   if(!jccFace[e]){session.RegisterJCC();Say(Optics.CompareJCC(session.Truth(e),session.H.lens,session.jccMode==1),true);}
+   if(!jccFace[e]){session.RegisterJCC();Say(session.AskJCC(),true);JCCTeach();}
    else Toast("JCC 已翻面；再滾一格看另一面並比較。");busy=false;SaveProgress();}
   IEnumerator CompareJCC(){
    busy=true;animationLog.Add("jcc-compare");string en=EN[session.eye];Transform flip=N("JCCFlip_"+en);Reach(N("JCCCell_"+en));
@@ -612,7 +617,7 @@ namespace RefractionRoom {
     audioOut.PlayOneShot(click,.5f);yield return new WaitForSeconds(.5f);
    }
    if(flip)DriveTo(flip,homePos[flip.name],rest,false,10);
-   jccFace[session.eye]=false;session.RegisterJCC();Say(Optics.CompareJCC(session.Truth(session.eye),session.H.lens,session.jccMode==1),true);busy=false;session.Log("JCC 兩面比較");SaveProgress();
+   jccFace[session.eye]=false;session.RegisterJCC();Say(session.AskJCC(),true);JCCTeach();busy=false;session.Log("JCC 兩面比較");SaveProgress();
   }
   public void Record(){if(busy)return;StartCoroutine(Action("record",()=>{session.Save();Toast("已寫入紙本紀錄："+session.EyeName+" "+session.H.lens);SaveProgress();}));}
   public void Next(){if(busy||pdStep>=0)return;var missing=session.Missing();if(session.mode=="教學"&&missing.Count>0){Toast("還需要："+missing[0]);return;}ReturnTools();held=0;targetFov=focused?FocusFov():66;session.Advance();if(session.stage>0&&!session.phoropterIn){session.phoropterIn=true;}SyncMechanics();DrawChart();SaveProgress();if(session.completed){notebook=true;Release();Toast("期中流程完成，請查看雙眼紀錄與回饋。");}else{Toast(session.StageTitle);if(focused)GoTo(FocusPoint(),Quaternion.identity);}Emit();}

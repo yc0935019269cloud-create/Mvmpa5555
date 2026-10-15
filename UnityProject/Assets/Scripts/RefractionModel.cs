@@ -18,10 +18,14 @@ namespace RefractionRoom {
   public static bool Neutral(Rx truth,Rx lens,float wd){for(int a=0;a<180;a+=5)if(Mathf.Abs(RetResidual(truth,lens,wd,a))>=.125f)return false;return true;}
   public static float Blur(Rx truth,Rx lens,bool pinhole=false){Vector3 r=Power(lens)-Power(truth);if(r.x<0)r.x*=.08f;float b=r.magnitude;return pinhole?b*.35f:b;}
   public static float Acuity(Rx truth,Rx lens,bool ph=false){return Mathf.Min(1.2f,Mathf.Pow(10,.04f-Mathf.Max(0,.5f*(Blur(truth,lens,ph)-.1f))));}
-  public static string Duo(Rx truth,Rx lens){float d=(Power(lens)-Power(truth)).x;return Mathf.Abs(d)<.13f?"兩邊一樣清楚。":d>0?"紅色那邊的字比較清楚。":"綠色那邊的字比較清楚。";}
+  // Duochrome: red clearer while the eye is under-minused by a step or more; green from the end point on.
+  // Practice rule: red -> add minus, green -> add plus; the end point is the first green after red.
+  public static string Duo(Rx truth,Rx lens){float d=(Power(lens)-Power(truth)).x;return d>.375f?"紅色那邊比較清楚，差很多。":d>.12f?"紅色那邊比較清楚。":d<-.37f?"綠色那邊比較清楚，差很多。":"綠色那邊比較清楚。";}
   public static Vector3 JCC(float redAxis){return new Vector3(0,.25f*Mathf.Cos(2*redAxis*Mathf.Deg2Rad),.25f*Mathf.Sin(2*redAxis*Mathf.Deg2Rad));}
-  public static string CompareJCC(Rx truth,Rx lens,bool axis){
-   float angle=lens.a+(axis?45:0);Vector3 res=Power(lens)-Power(truth),j=JCC(angle);
+  public static string CompareJCC(Rx truth,Rx lens,bool axis){return CompareJCCAt(truth,lens,lens.a+(axis?45:0));}
+  // first face = red dot (minus cylinder axis) at redAxis, second face = white dot there
+  public static string CompareJCCAt(Rx truth,Rx lens,float angle){
+   Vector3 res=Power(lens)-Power(truth),j=JCC(angle);
    float first=(res+j).magnitude,second=(res-j).magnitude;
    if(Mathf.Abs(first-second)<.03f)return "兩片差不多清楚。";
    return first<second?"第一片比較清楚。":"第二片比較清楚。";
@@ -54,6 +58,7 @@ namespace RefractionRoom {
   public float vaLog=99,phLog=99,readLog=99,readVA;public int lastLetters;
   public bool vaSaved,mp1Saved,jccSaved,secondFogged;
   public string route="APA";
+  public float searchAngle=180;public int searchSeen;
   public int routeIndex,routeComparisons;
  }
  [Serializable] public class ClinicSession {
@@ -68,10 +73,31 @@ namespace RefractionRoom {
   public bool phoropterIn;
   public List<string> events=new List<string>();
   public List<string> examErrors=new List<string>();
-  public Rx Truth(int e){int k=(patient-1)%6;Rx[] od={new Rx(-2,-1,180),new Rx(-1.25f,-.75f,90),new Rx(.75f,-1.25f,175),new Rx(-3,-1.5f,10),new Rx(-.5f,-.5f,80),new Rx(1.5f,-.75f,165)};Rx[] os={new Rx(-1.5f,-.75f,90),new Rx(-1,-.5f,85),new Rx(1,-1,170),new Rx(-2.75f,-1.25f,5),new Rx(-.75f,-.75f,95),new Rx(1.25f,-1,160)};return e==0?od[k]:os[k];}
-  public int TruePD {get{return new int[]{64,62,66,63,61,65}[(patient-1)%6];}}
-  public string PatientName {get{return new string[]{"林同學","陳同學","許同學","張同學","李同學","王同學"}[(patient-1)%6];}}
+  // patient 0 = random case generated at Begin (19-21-year-old, mostly myopic, mostly with-the-rule)
+  public Rx randOD=new Rx(-2,-.5f,180),randOS=new Rx(-2,-.5f,180);public int randPD=63;
+  public void Randomize(int seed){
+   var rng=new System.Random(seed);System.Func<double> U=()=>rng.NextDouble();
+   System.Func<double,double,double> N=(m,sd)=>m+sd*System.Math.Sqrt(-2*System.Math.Log(1-U()))*System.Math.Cos(2*System.Math.PI*U());
+   double p=U(),se=p<.08?N(.25,.35):p<.11?1+U()*1.25:p<.92?-.75-System.Math.Abs(N(0,2.3)):-6.5-U()*2.5;
+   se=System.Math.Max(-9,System.Math.Min(2.25,se));
+   double cyl=U()<.25?0:-.25-System.Math.Abs(N(0,.6));cyl=System.Math.Max(-2.5,cyl);
+   double q=U(),ax=q<.7?N(180,9):q<.85?N(90,10):(U()<.5?N(45,12):N(135,12));
+   float Q(double x){return Mathf.Round((float)x*4)/4f;}float A(double a){return Optics.Axis(Mathf.Round((float)a/5)*5);}
+   float c1=Q(cyl),c2=Mathf.Min(0,Q(cyl+N(0,.2)));float se2=(float)(se+Mathf.Clamp((float)N(0,.4),-1.25f,1.25f));
+   randOD=new Rx(Q(se-c1/2),c1,c1==0?180:A(ax));randOS=new Rx(Q(se2-c2/2),c2,c2==0?180:A(180-ax+N(0,6)));
+   randPD=Mathf.Clamp(Mathf.RoundToInt((float)N(63,2.4)),59,68);
+  }
+  public Rx Truth(int e){if(patient==0)return e==0?randOD:randOS;int k=(patient-1)%6;Rx[] od={new Rx(-2,-1,180),new Rx(-1.25f,-.75f,90),new Rx(.75f,-1.25f,175),new Rx(-3,-1.5f,10),new Rx(-.5f,-.5f,80),new Rx(1.5f,-.75f,165)};Rx[] os={new Rx(-1.5f,-.75f,90),new Rx(-1,-.5f,85),new Rx(1,-1,170),new Rx(-2.75f,-1.25f,5),new Rx(-.75f,-.75f,95),new Rx(1.25f,-1,160)};return e==0?od[k]:os[k];}
+  public int TruePD {get{return patient==0?randPD:new int[]{64,62,66,63,61,65}[(patient-1)%6];}}
+  public string PatientName {get{return patient==0?"隨機病患":new string[]{"林同學","陳同學","許同學","張同學","李同學","王同學"}[(patient-1)%6];}}
   public EyeHistory H {get{return eyes[eye];}}
+  // PPAP first P: cylinder search with the JCC power dots at 180/45/90/135; the lens is untouched
+  public bool Searching {get{return Phase==3&&H.route=="PPAP"&&H.routeIndex==0;}}
+  public float JCCRef(int e){return e==eye&&Searching?eyes[e].searchAngle:eyes[e].lens.a;}
+  public string AskJCC(){return Optics.CompareJCCAt(Truth(eye),H.lens,JCCRef(eye)+(jccMode==1?45:0));}
+  public static int SearchBucket(float a){return Mathf.RoundToInt(Optics.Axis(a)/45f)%4;}
+  public static readonly float[] SearchAngles={180,45,90,135};
+  public List<float> RedAngles(){var r=new List<float>();foreach(float a in SearchAngles)if(Optics.CompareJCCAt(Truth(eye),H.lens,a).StartsWith("第一"))r.Add(a);return r;}
   public string EyeName {get{return eye==0?"右眼 OD":"左眼 OS";}}
   // Order follows the midterm record sheet: ① RET (both eyes) + WD + VA, ② 1st MPMVA + duochrome (both eyes),
   // ③ JCC (both eyes, recorded), ④ 2nd MPMVA (both eyes, best VA).
@@ -90,7 +116,7 @@ namespace RefractionRoom {
    if(Phase==0){if(H.netSaved)H.lens=H.net;H.reads=0;H.measuredVA=0;H.vaLog=99;H.vaText="";H.phRead=false;occluded=true;row=.6f;}
    if(Phase==1){H.lens=H.net;H.reads=0;H.fogged=false;occluded=true;row=1;}
    if(Phase==2)chart=1;
-   if(Phase==3){chart=2;H.route=Mathf.Abs(H.lens.c)>=.75f?"APA":"PPAP";H.routeIndex=0;H.routeComparisons=0;jccMode=JCCPattern[0];}
+   if(Phase==3){chart=2;H.route=Mathf.Abs(H.lens.c)>=.75f?"APA":"PPAP";H.routeIndex=0;H.routeComparisons=0;jccMode=JCCPattern[0];H.searchAngle=180;H.searchSeen=0;}
    if(Phase==4){chart=2;jccMode=0;}
    if(Phase==5){H.reads=0;H.secondFogged=false;chart=0;jccMode=0;}
   }
@@ -98,6 +124,8 @@ namespace RefractionRoom {
    if(e<0)e=eye;var h=eyes[e];Rx r=h.lens;
    for(int k=0;k<steps;k++){
     if(parameter==0)r.s=Mathf.Clamp(r.s+sign*.25f,-19,16.75f);
+    if(parameter==1&&Searching&&e==eye&&r.c==0&&sign<0)r.a=h.searchAngle;
+    if(parameter==2&&Searching&&e==eye){h.searchAngle=Optics.Axis(h.searchAngle+sign*45);continue;}
     if(parameter==1){float old=r.c;r.c=Mathf.Clamp(r.c+sign*.25f,-6,0);if(stage>3){h.cylComp-=.5f*(r.c-old);if(Mathf.Abs(h.cylComp)>=.249f){float comp=Mathf.Round(h.cylComp*4)/4;r.s+=comp;h.cylComp-=comp;}}}
     if(parameter==2)r.a=Optics.Axis(r.a+sign*5);
    }
@@ -130,16 +158,17 @@ namespace RefractionRoom {
    if(stage==1||stage==2){if(!Optics.Neutral(Truth(eye),H.lens,Optics.WD(wdCm)))m.Add("兩條主子午線都要中和");if(H.sweeps<2)m.Add("至少在兩個不同方向掃動光帶");if(!H.grossSaved||H.gross.ToString()!=H.lens.ToString())m.Add("記錄目前中和鏡片");return m;}
    if(stage==3){if(!wdRemoved)m.Add("從兩眼球面扣除工作距離度數");if(!eyes[0].netSaved||!eyes[1].netSaved)m.Add("記錄淨檢影值與工作距離");return m;}
    if(Phase==0){if(!occluded)m.Add("遮蓋非測試眼");if(H.reads<2)m.Add("以淨檢影值至少讀兩列找出最佳視力");if(H.measuredVA<.8f&&!H.phRead)m.Add("VA < 0.8，補測 PH 視力");if(ph)m.Add("將針孔轉開");if(!H.vaSaved)m.Add("記錄檢影度數與 VA");}
-   if(Phase==1){if(!H.fogged)m.Add("先加正度數霧視至少 +0.75D");if(H.reads<2)m.Add("邊退霧邊讀視標");if(Mathf.Abs((Optics.Power(H.lens)-Optics.Power(Truth(eye))).x)>.13f)m.Add("找出維持最佳視力的最大正度數");if(!H.mp1Saved||H.mp1.ToString()!=H.lens.ToString())m.Add("記錄第一次 MPMVA 度數與 VA");}
-   if(Phase==2){if(!H.duoAsked)m.Add("切紅綠視標並詢問清晰度");if(Mathf.Abs((Optics.Power(H.lens)-Optics.Power(Truth(eye))).x)>.13f)m.Add("紅清加負、綠清加正，至等清");}
-   if(Phase==3){if(jccMode!=JCCPattern[H.routeIndex])m.Add("切到本輪要求的 JCC "+(JCCPattern[H.routeIndex]==1?"軸位 A":"度數 P"));if(H.routeComparisons<2)m.Add("本輪至少做兩次翻面比較");if(!Optics.CompareJCC(Truth(eye),H.lens,JCCPattern[H.routeIndex]==1).StartsWith("兩片"))m.Add("依受測者回答微調至兩片等清");}
+   if(Phase==1){float fe=(Optics.Power(H.lens)-Optics.Power(Truth(eye))).x;if(!H.fogged)m.Add("先加正度數霧視至少 +0.75D");if(H.reads<2)m.Add("邊退霧邊讀視標");if(fe>.38f||fe<-.13f)m.Add("找出維持最佳視力的最大正度數");if(!H.mp1Saved||H.mp1.ToString()!=H.lens.ToString())m.Add("記錄第一次 MPMVA 度數與 VA");}
+   if(Phase==2){if(!H.duoAsked)m.Add("切紅綠視標並詢問清晰度");if(Mathf.Abs((Optics.Power(H.lens)-Optics.Power(Truth(eye))).x)>.13f)m.Add("紅清加負、綠清加正，停在第一次出現綠色");}
+   if(Phase==3&&Searching){if(jccMode!=2)m.Add("切到 JCC 度數 P");int seen=0;for(int k=0;k<4;k++)if((H.searchSeen&(1<<k))!=0)seen++;if(seen<4)m.Add("JCC P 紅點依序放 180°、45°、90°、135° 各翻面比較一次（已做 "+seen+"/4，轉柱軸鈕一次轉 45°）");else foreach(float ra in RedAngles()){if(H.lens.c==0){m.Add("受測者在 "+ra.ToString("0")+"° 選紅點：柱面加 −0.25、軸放 "+ra.ToString("0")+"°，再翻面確認");break;}if(Optics.AxisError(ra,H.lens.a)<1){m.Add("同軸方向仍選紅點：柱面再加 −0.25");break;}if(Optics.AxisError(ra,H.lens.a)>89){m.Add("垂直方向選紅點：柱面減少 0.25");break;}}}
+   else if(Phase==3){if(jccMode!=JCCPattern[H.routeIndex])m.Add("切到本輪要求的 JCC "+(JCCPattern[H.routeIndex]==1?"軸位 A":"度數 P"));if(H.routeComparisons<2)m.Add("本輪至少做兩次翻面比較");if(!Optics.CompareJCC(Truth(eye),H.lens,JCCPattern[H.routeIndex]==1).StartsWith("兩片"))m.Add("依受測者回答微調至兩片等清");}
    if(Phase==4){if(H.axisComparisons<2||H.powerComparisons<2)m.Add("完成 APA 或 PPAP 路線");if((Optics.Power(H.lens)-Optics.Power(Truth(eye))).magnitude>.19f)m.Add("複核柱面與軸位，並保持球面等效");if(jccMode!=0)m.Add("收回 JCC");if(!H.jccSaved||H.jccResult.ToString()!=H.lens.ToString())m.Add("記錄 JCC 後處方");}
    if(Phase==5){if(!H.secondFogged)m.Add("加 +0.50D 再霧視，逐格退霧");if(H.reads<2)m.Add("雙眼 JCC 後再核對視力至少兩次");if((Optics.Power(H.lens)-Optics.Power(Truth(eye))).magnitude>.2f)m.Add("再次確認最大正度數最佳視力");if(!H.finalSaved||H.finalKey!=LensKey(eye))m.Add("記錄第二次 MPMVA 度數與最佳 VA");}
    if(stage==16){foreach(var h in eyes)if(!h.finalSaved)m.Add("雙眼最終紀錄未齊");}
    if(stage>=4&&stage<=15&&!occluded&&!m.Contains("遮蓋非測試眼"))m.Add("保持非測試眼遮蓋");
    return m;
   }
-  public void RegisterJCC(){if(jccMode==1)H.axisComparisons++;else H.powerComparisons++;if(Phase==3&&jccMode==JCCPattern[H.routeIndex])H.routeComparisons++;}
+  public void RegisterJCC(){if(Searching&&jccMode==2)H.searchSeen|=1<<SearchBucket(H.searchAngle);if(jccMode==1)H.axisComparisons++;else H.powerComparisons++;if(Phase==3&&jccMode==JCCPattern[H.routeIndex])H.routeComparisons++;}
   public bool Advance(){var missing=Missing();if(mode=="教學"&&missing.Count>0)return false;if(mode=="考試"&&missing.Count>0)examErrors.Add(StageTitle+"："+string.Join("、",missing));if(Phase==3&&H.routeIndex<JCCPattern.Length-1){H.routeIndex++;H.routeComparisons=0;jccMode=JCCPattern[H.routeIndex];Log("JCC "+H.route+" 第 "+(H.routeIndex+1)+" 輪");return true;}if(stage<16){stage++;EnterStage();}else completed=true;Log("進入 "+Titles[stage]);return true;}
   public int Score(){
    float score=0;foreach(bool b in prepared)if(b)score+=10f/9;

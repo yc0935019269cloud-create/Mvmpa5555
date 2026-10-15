@@ -13,6 +13,9 @@ PASS Over-minus gives green-clear response: add plus
 PASS Correct Rx has good acuity
 PASS Pinhole improves optical blur in this model
 PASS Balanced axis produces equal JCC responses
+PASS Duochrome end point is the first green after red
+PASS Four-direction P search: red preferred only on the hidden minus-cylinder axis (180), white at 90, equal at 45/135
+PASS Random 19-21-year-old cases stay in range (0.25 D steps, minus cylinder, PD 59-68)
 PASS Partial-line VA notation: 1.2 two letters = 1.0 +2, 1.0 three = 1.0 -2, 1.0 one = 0.9 +1
 PASS Two -0.25 cylinder steps compensated by +0.25 sphere
 PASS Case 1 requires all nine preparation actions
@@ -79,6 +82,7 @@ PASS Case 2 eye 0 JCC APA ordered comparisons
 PASS Case 2 eye 0 JCC APA ordered comparisons
 PASS Case 2 eye 0 JCC record
 PASS Case 2 eye 1 JCC only after both eyes' MPMVA
+PASS Case 2 eye 1 first P needs the four-direction search
 PASS Case 2 eye 1 JCC PPAP ordered comparisons
 PASS Case 2 eye 1 JCC PPAP ordered comparisons
 PASS Case 2 eye 1 JCC PPAP ordered comparisons
@@ -189,6 +193,7 @@ PASS Case 5 eye 1 first MPMVA recorded
 PASS Case 5 eye 1 duochrome follows its MPMVA
 PASS Case 5 eye 1 duochrome
 PASS Case 5 eye 0 JCC only after both eyes' MPMVA
+PASS Case 5 eye 0 first P needs the four-direction search
 PASS Case 5 eye 0 JCC PPAP ordered comparisons
 PASS Case 5 eye 0 JCC PPAP ordered comparisons
 PASS Case 5 eye 0 JCC PPAP ordered comparisons
@@ -247,4 +252,4 @@ PASS Case 6 completes the midterm workflow
 PASS Case 6 full workflow scores 100
 PASS Exam allows progression and records unmet criteria without giving hints
 PASS An unattempted clinical case does not receive clinical points
-249 checks passed
+254 checks passed

@@ -67,6 +67,9 @@ public static class ClinicBuild {
   Check(Optics.Acuity(truth,truth)>.99f,"Correct Rx has good acuity");
   Check(Optics.Acuity(truth,new Rx(0,0,180),true)>Optics.Acuity(truth,new Rx(0,0,180)),"Pinhole improves optical blur in this model");
   Check(Optics.CompareJCC(truth,truth,true).StartsWith("兩片"),"Balanced axis produces equal JCC responses");
+  Check(Optics.Duo(truth,truth).StartsWith("綠")&&Optics.Duo(truth,new Rx(-1.75f,-1,180)).StartsWith("紅"),"Duochrome end point is the first green after red");
+  {var ss=new ClinicSession();ss.patient=1;var noCyl=new Rx(-2.5f,0,180);bool ok=true;foreach(float a in ClinicSession.SearchAngles){string r=Optics.CompareJCCAt(truth,noCyl,a);ok&=a==180?r.StartsWith("第一"):a==90?r.StartsWith("第二"):r.StartsWith("兩片");}Check(ok,"Four-direction P search: red preferred only on the hidden minus-cylinder axis (180), white at 90, equal at 45/135");}
+  {bool ok=true;for(int seed=1;seed<=400;seed++){var rs=new ClinicSession();rs.patient=0;rs.Randomize(seed);foreach(var r in new[]{rs.randOD,rs.randOS})ok&=r.c<=0&&r.c>=-2.5f&&r.s>=-10&&r.s<=3.5f&&Mathf.Abs(r.s*4-Mathf.Round(r.s*4))<.001f&&r.a>0&&r.a<=180;ok&=rs.TruePD>=59&&rs.TruePD<=68;}Check(ok,"Random 19-21-year-old cases stay in range (0.25 D steps, minus cylinder, PD 59-68)");}
   {float b,l;Check(Optics.VALabel(1.2f,2,out b,out l)=="1.0 +2"&&Optics.VALabel(1f,3,out b,out l)=="1.0 -2"&&Optics.VALabel(1f,1,out b,out l)=="0.9 +1"&&Optics.VALabel(1f,5,out b,out l)=="1.0","Partial-line VA notation: 1.2 two letters = 1.0 +2, 1.0 three = 1.0 -2, 1.0 one = 0.9 +1");}
   var comp=new ClinicSession();comp.stage=8;comp.H.lens=new Rx(-2,-.5f,180);float eq=Optics.Power(comp.H.lens).x;comp.Adjust(1,-1);comp.Adjust(1,-1);Check(Mathf.Abs(eq-Optics.Power(comp.H.lens).x)<.001f,"Two -0.25 cylinder steps compensated by +0.25 sphere");
   for(int patient=1;patient<=6;patient++){
@@ -88,7 +91,7 @@ public static class ClinicBuild {
    // ③ JCC on both eyes, each recorded
    for(int e=0;e<2;e++){
     Check(s.eye==e&&s.Phase==3,"Case "+patient+" eye "+e+" JCC only after both eyes' MPMVA");
-    while(s.Phase==3){s.RegisterJCC();s.RegisterJCC();Check(s.Advance(),"Case "+patient+" eye "+e+" JCC "+s.H.route+" ordered comparisons");}
+    while(s.Phase==3){if(s.Searching){Check(s.Missing().Exists(x=>x.Contains("0/4")),"Case "+patient+" eye "+e+" first P needs the four-direction search");foreach(float a in ClinicSession.SearchAngles){s.H.searchAngle=a;s.RegisterJCC();}}else{s.RegisterJCC();s.RegisterJCC();}Check(s.Advance(),"Case "+patient+" eye "+e+" JCC "+s.H.route+" ordered comparisons");}
     s.Save();Check(s.Advance(),"Case "+patient+" eye "+e+" JCC record");
    }
    // ④ 2nd MPMVA on both eyes after both JCC records

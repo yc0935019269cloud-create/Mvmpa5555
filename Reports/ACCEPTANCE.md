@@ -51,3 +51,8 @@
 - 病人與第一人稱雙手改用 MakeHuman CC0 素材（MPFB 2.0.18 產生，工具本身不入庫），眼睛保留自製程序眼。
 - ClinicBuild.Validate 249 項 PASS；Unity 6000.6.5f1 WebGL 建置 Succeeded、Errors 0；`node tools/verify-site.mjs` 通過。
 - 本機瀏覽器 `?qa=1`：完整期中流程 PASS_FULL_MIDTERM_FLOW、missing=0、PD 64 mm；工作距離頂部選單可選並更新 D 值。
+
+## 2026-10-16 JCC 四方向／紅綠／隨機病患
+
+- Validate 254 項 PASS（新增：紅綠終點為第一次綠色、四方向 P 只在隱藏負柱軸選紅點、隨機病例 400 組皆在範圍內）。
+- WebGL Succeeded、Errors 0；verify-site 通過；瀏覽器 ?qa=1 完整流程 PASS_FULL_MIDTERM_FLOW、missing=0。
