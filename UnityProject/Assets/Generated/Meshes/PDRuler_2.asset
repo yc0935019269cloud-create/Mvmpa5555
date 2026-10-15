@@ -6,19 +6,19 @@ Mesh:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: PDRuler_RulerTick
+  m_Name: PDRuler_RulerNoseMark
   serializedVersion: 12
   m_SubMeshes:
   - serializedVersion: 2
     firstByte: 0
-    indexCount: 36
+    indexCount: 6
     topology: 0
     baseVertex: 0
     firstVertex: 0
-    vertexCount: 8
+    vertexCount: 4
     localAABB:
-      m_Center: {x: 0, y: 0, z: 0}
-      m_Extent: {x: 0.00035, y: 0.006, z: 0.0005}
+      m_Center: {x: 0, y: -0.007999999, z: -0.00085}
+      m_Extent: {x: 0.0016, y: 0.0014999998, z: 0}
   m_Shapes:
     vertices: []
     shapes: []
@@ -35,10 +35,10 @@ Mesh:
   m_KeepVertices: 0
   m_KeepIndices: 0
   m_IndexFormat: 0
-  m_IndexBuffer: 000003000100000002000300020007000300020006000700060005000700060004000500040001000500040000000100020004000600020000000400070001000300070005000100y
+  m_IndexBuffer: 000002000100000003000200y
   m_VertexData:
     serializedVersion: 3
-    m_VertexCount: 8
+    m_VertexCount: 4
     m_Channels:
     - stream: 0
       offset: 0
@@ -96,8 +96,8 @@ Mesh:
       offset: 0
       format: 0
       dimension: 0
-    m_DataSize: 256
-    _typelessdata: 3480b7b9a69bc4bb6f1203ba488971bf0f6fe1bc4b13a9be0000003e0000403f3480b7b9a69bc43b6f1203bac07414bf1a8f8a3da6d64fbf0000603f0000403f3480b7b9a69bc4bb6f12033ac07414bf1a8f8abda6d64f3f0000003e0000003f3480b7b9a69bc43b6f12033a488971bf0f6fe13c4b13a93e0000603f0000003f3480b739a69bc4bb6f1203bac074143f1a8f8abda6d64fbf0000c03e0000403f3480b739a69bc43b6f1203ba4889713f0f6fe13c4b13a9be0000203f0000403f3480b739a69bc4bb6f12033a4889713f0f6fe1bc4b13a93e0000c03e0000003f3480b739a69bc43b6f12033ac074143f1a8f8a3da6d64f3f0000203f0000003f
+    m_DataSize: 128
+    _typelessdata: 17b7d13ae3a51bbc89d25eba0000000000000000000080bf000000000000000000000000f4fdd4bb89d25eba000000000000000000000000000000000000000000000000f4fdd4bb89d25eba0000000000000000000080bf000000000000000017b7d1bae3a51bbc89d25eba0000000000000000000080bf0000000000000000
   m_CompressedMesh:
     m_Vertices:
       m_NumItems: 0
@@ -151,8 +151,8 @@ Mesh:
       m_BitSize: 0
     m_UVInfo: 0
   m_LocalAABB:
-    m_Center: {x: 0, y: 0, z: 0}
-    m_Extent: {x: 0.00035, y: 0.006, z: 0.0005}
+    m_Center: {x: 0, y: -0.007999999, z: -0.00085}
+    m_Extent: {x: 0.0016, y: 0.0014999998, z: 0}
   m_CookingOptions: 30
   m_PreBakeConvexCollisionMesh: 0
   m_PreBakeTriangleCollisionMesh: 0

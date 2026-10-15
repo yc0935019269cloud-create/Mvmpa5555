@@ -8,8 +8,10 @@ namespace RefractionRoom {
   ClinicWorld w;
   bool running;
   public string result="";
-  public void Run(){if(running)return;if(!Application.absoluteURL.Contains("qa=1")&&!Application.isEditor)return;w=ClinicWorld.Main;StartCoroutine(Flow());}
+  float startedAt=-999;
+  public void Run(){if(running&&Time.time-startedAt<900)return;if(!Application.absoluteURL.Contains("qa=1")&&!Application.isEditor)return;w=ClinicWorld.Main;if(!w||!w.ui)return;startedAt=Time.time;StopAllCoroutines();StartCoroutine(Flow());}
   IEnumerator Wait(){while(w.busy)yield return null;yield return null;}
+  IEnumerator Settle(){yield return new WaitForSeconds(.3f);while(w.busy)yield return null;}
   IEnumerator Lens(Rx desired){
    for(int p=0;p<3;p++){
     w.SetParameter(p);
@@ -27,7 +29,13 @@ namespace RefractionRoom {
   IEnumerator Flow(){
    running=true;result="RUNNING";w.ui.voice=false;w.ui.selectedPatient=1;w.Begin("教學");w.Release();
    w.view.transform.position=new Vector3(0,1.65f,2.2f);w.Focus();yield return new WaitForSeconds(.8f);
-   for(int i=0;i<9;i++){w.Prepare(i);yield return Wait();}
+   w.Prepare(0);yield return Wait();
+   // PD rule: instruct, close own right eye, zero on OD temporal pupil edge, switch eyes, read OS nasal edge
+   w.Prepare(1);yield return Wait();w.PDInstruct();w.PDClose(1);yield return new WaitForSeconds(.6f);
+   var ruler=w.N("PDRuler");ruler.position+=new Vector3(w.PDZeroError()/1000f,0,0);w.PDConfirm();
+   w.PDClose(2);yield return new WaitForSeconds(.6f);w.pdReading=Mathf.Round(w.PDExpected()*2)/2;w.PDConfirm();yield return Wait();
+   if(!w.session.prepared[1])throw new Exception("Runtime QA: PD was not recorded");
+   for(int i=2;i<9;i++){w.Prepare(i);yield return Wait();}
    Next();
    for(int e=0;e<2;e++){
     w.HoldRet();yield return new WaitForSeconds(.8f);
@@ -35,14 +43,20 @@ namespace RefractionRoom {
     w.Sweep();yield return Wait();for(int i=0;i<6;i++)w.Streak(1);w.Sweep();yield return Wait();w.Record();yield return Wait();Next();
    }
    w.RemoveWD();yield return Wait();w.Record();yield return Wait();Next();
-   for(int e=0;e<2;e++){
+   for(int e=0;e<2;e++){   // ① VA through net RET, OD then OS
     if(!w.session.occluded){w.Occlude();yield return Wait();}
     w.Ask();yield return Wait();w.Row(1);w.Ask();yield return Wait();
     if(w.session.H.measuredVA<.8f){w.Pinhole();yield return Wait();w.Ask();yield return Wait();w.Pinhole();yield return Wait();}w.Record();yield return Wait();Next();
+   }
+   for(int e=0;e<2;e++){   // ② 1st MPMVA + duochrome
     w.Fog();yield return Wait();w.Ask();yield return Wait();yield return Lens(w.session.Truth(e));w.Ask();yield return Wait();w.Record();yield return Wait();Next();
     w.Ask();yield return Wait();Next();
+   }
+   for(int e=0;e<2;e++){   // ③ JCC, recorded
     while(w.session.Phase==3){w.Ask();yield return Wait();w.Ask();yield return Wait();Next();}
     w.Record();yield return Wait();Next();
+   }
+   for(int e=0;e<2;e++){   // ④ 2nd MPMVA
     w.Fog();yield return Wait();w.Ask();yield return Wait();yield return Lens(w.session.Truth(e));w.Ask();yield return Wait();w.Record();yield return Wait();Next();
    }
    Next();result=w.session.completed?"PASS_FULL_MIDTERM_FLOW":"FAIL_NOT_COMPLETED";w.lastAction=result;Debug.Log(result+" "+w.Evidence());running=false;

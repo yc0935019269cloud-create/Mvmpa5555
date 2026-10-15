@@ -3,7 +3,7 @@ PASS 0 and 180 are identical cylinder axes
 PASS Cylinder has no power along its axis
 PASS Working-distance diopters
 PASS Patient pupil to calibrated wall display is six metres
-PASS Aligned rear optical surface is twelve millimetres from the pupil
+PASS Aligned rear face of the lens batteries is twelve millimetres from the pupil
 PASS Both principal meridians neutral at true Rx plus WD
 PASS One neutral meridian cannot pass astigmatic retinoscopy
 PASS Below neutrality produces with motion
@@ -20,24 +20,34 @@ PASS Case 1 eye 0 gross retinoscopy
 PASS Case 1 eye 1 gross retinoscopy
 PASS Case 1 WD must be deducted and recorded
 PASS Case 1 net retinoscopy
-PASS Case 1 OD then OS sequence
-PASS Case 1 eye 0 VA and PH
-PASS Case 1 eye 0 first MPMVA
+PASS Case 1 eye 0 net-RET VA in OD then OS order
+PASS Case 1 eye 0 VA starts from the net retinoscopy
+PASS Case 1 eye 0 RET VA recorded
+PASS Case 1 eye 1 net-RET VA in OD then OS order
+PASS Case 1 eye 1 VA starts from the net retinoscopy
+PASS Case 1 eye 1 RET VA recorded
+PASS Case 1 eye 0 first MPMVA before JCC
+PASS Case 1 eye 0 first MPMVA recorded
+PASS Case 1 eye 0 duochrome follows its MPMVA
 PASS Case 1 eye 0 duochrome
+PASS Case 1 eye 1 first MPMVA before JCC
+PASS Case 1 eye 1 first MPMVA recorded
+PASS Case 1 eye 1 duochrome follows its MPMVA
+PASS Case 1 eye 1 duochrome
+PASS Case 1 eye 0 JCC only after both eyes' MPMVA
 PASS Case 1 eye 0 JCC APA ordered comparisons
 PASS Case 1 eye 0 JCC APA ordered comparisons
 PASS Case 1 eye 0 JCC APA ordered comparisons
 PASS Case 1 eye 0 JCC record
-PASS Changed lens invalidates final record
-PASS Case 1 eye 0 final MPMVA record
-PASS Case 1 OD then OS sequence
-PASS Case 1 eye 1 VA and PH
-PASS Case 1 eye 1 first MPMVA
-PASS Case 1 eye 1 duochrome
+PASS Case 1 eye 1 JCC only after both eyes' MPMVA
 PASS Case 1 eye 1 JCC APA ordered comparisons
 PASS Case 1 eye 1 JCC APA ordered comparisons
 PASS Case 1 eye 1 JCC APA ordered comparisons
 PASS Case 1 eye 1 JCC record
+PASS Case 1 eye 0 second MPMVA after both JCC records
+PASS Changed lens invalidates final record
+PASS Case 1 eye 0 final MPMVA record
+PASS Case 1 eye 1 second MPMVA after both JCC records
 PASS Changed lens invalidates final record
 PASS Case 1 eye 1 final MPMVA record
 PASS Case 1 completes the midterm workflow
@@ -48,25 +58,35 @@ PASS Case 2 eye 0 gross retinoscopy
 PASS Case 2 eye 1 gross retinoscopy
 PASS Case 2 WD must be deducted and recorded
 PASS Case 2 net retinoscopy
-PASS Case 2 OD then OS sequence
-PASS Case 2 eye 0 VA and PH
-PASS Case 2 eye 0 first MPMVA
+PASS Case 2 eye 0 net-RET VA in OD then OS order
+PASS Case 2 eye 0 VA starts from the net retinoscopy
+PASS Case 2 eye 0 RET VA recorded
+PASS Case 2 eye 1 net-RET VA in OD then OS order
+PASS Case 2 eye 1 VA starts from the net retinoscopy
+PASS Case 2 eye 1 RET VA recorded
+PASS Case 2 eye 0 first MPMVA before JCC
+PASS Case 2 eye 0 first MPMVA recorded
+PASS Case 2 eye 0 duochrome follows its MPMVA
 PASS Case 2 eye 0 duochrome
+PASS Case 2 eye 1 first MPMVA before JCC
+PASS Case 2 eye 1 first MPMVA recorded
+PASS Case 2 eye 1 duochrome follows its MPMVA
+PASS Case 2 eye 1 duochrome
+PASS Case 2 eye 0 JCC only after both eyes' MPMVA
 PASS Case 2 eye 0 JCC APA ordered comparisons
 PASS Case 2 eye 0 JCC APA ordered comparisons
 PASS Case 2 eye 0 JCC APA ordered comparisons
 PASS Case 2 eye 0 JCC record
-PASS Changed lens invalidates final record
-PASS Case 2 eye 0 final MPMVA record
-PASS Case 2 OD then OS sequence
-PASS Case 2 eye 1 VA and PH
-PASS Case 2 eye 1 first MPMVA
-PASS Case 2 eye 1 duochrome
+PASS Case 2 eye 1 JCC only after both eyes' MPMVA
 PASS Case 2 eye 1 JCC PPAP ordered comparisons
 PASS Case 2 eye 1 JCC PPAP ordered comparisons
 PASS Case 2 eye 1 JCC PPAP ordered comparisons
 PASS Case 2 eye 1 JCC PPAP ordered comparisons
 PASS Case 2 eye 1 JCC record
+PASS Case 2 eye 0 second MPMVA after both JCC records
+PASS Changed lens invalidates final record
+PASS Case 2 eye 0 final MPMVA record
+PASS Case 2 eye 1 second MPMVA after both JCC records
 PASS Changed lens invalidates final record
 PASS Case 2 eye 1 final MPMVA record
 PASS Case 2 completes the midterm workflow
@@ -77,24 +97,34 @@ PASS Case 3 eye 0 gross retinoscopy
 PASS Case 3 eye 1 gross retinoscopy
 PASS Case 3 WD must be deducted and recorded
 PASS Case 3 net retinoscopy
-PASS Case 3 OD then OS sequence
-PASS Case 3 eye 0 VA and PH
-PASS Case 3 eye 0 first MPMVA
+PASS Case 3 eye 0 net-RET VA in OD then OS order
+PASS Case 3 eye 0 VA starts from the net retinoscopy
+PASS Case 3 eye 0 RET VA recorded
+PASS Case 3 eye 1 net-RET VA in OD then OS order
+PASS Case 3 eye 1 VA starts from the net retinoscopy
+PASS Case 3 eye 1 RET VA recorded
+PASS Case 3 eye 0 first MPMVA before JCC
+PASS Case 3 eye 0 first MPMVA recorded
+PASS Case 3 eye 0 duochrome follows its MPMVA
 PASS Case 3 eye 0 duochrome
+PASS Case 3 eye 1 first MPMVA before JCC
+PASS Case 3 eye 1 first MPMVA recorded
+PASS Case 3 eye 1 duochrome follows its MPMVA
+PASS Case 3 eye 1 duochrome
+PASS Case 3 eye 0 JCC only after both eyes' MPMVA
 PASS Case 3 eye 0 JCC APA ordered comparisons
 PASS Case 3 eye 0 JCC APA ordered comparisons
 PASS Case 3 eye 0 JCC APA ordered comparisons
 PASS Case 3 eye 0 JCC record
-PASS Changed lens invalidates final record
-PASS Case 3 eye 0 final MPMVA record
-PASS Case 3 OD then OS sequence
-PASS Case 3 eye 1 VA and PH
-PASS Case 3 eye 1 first MPMVA
-PASS Case 3 eye 1 duochrome
+PASS Case 3 eye 1 JCC only after both eyes' MPMVA
 PASS Case 3 eye 1 JCC APA ordered comparisons
 PASS Case 3 eye 1 JCC APA ordered comparisons
 PASS Case 3 eye 1 JCC APA ordered comparisons
 PASS Case 3 eye 1 JCC record
+PASS Case 3 eye 0 second MPMVA after both JCC records
+PASS Changed lens invalidates final record
+PASS Case 3 eye 0 final MPMVA record
+PASS Case 3 eye 1 second MPMVA after both JCC records
 PASS Changed lens invalidates final record
 PASS Case 3 eye 1 final MPMVA record
 PASS Case 3 completes the midterm workflow
@@ -105,24 +135,34 @@ PASS Case 4 eye 0 gross retinoscopy
 PASS Case 4 eye 1 gross retinoscopy
 PASS Case 4 WD must be deducted and recorded
 PASS Case 4 net retinoscopy
-PASS Case 4 OD then OS sequence
-PASS Case 4 eye 0 VA and PH
-PASS Case 4 eye 0 first MPMVA
+PASS Case 4 eye 0 net-RET VA in OD then OS order
+PASS Case 4 eye 0 VA starts from the net retinoscopy
+PASS Case 4 eye 0 RET VA recorded
+PASS Case 4 eye 1 net-RET VA in OD then OS order
+PASS Case 4 eye 1 VA starts from the net retinoscopy
+PASS Case 4 eye 1 RET VA recorded
+PASS Case 4 eye 0 first MPMVA before JCC
+PASS Case 4 eye 0 first MPMVA recorded
+PASS Case 4 eye 0 duochrome follows its MPMVA
 PASS Case 4 eye 0 duochrome
+PASS Case 4 eye 1 first MPMVA before JCC
+PASS Case 4 eye 1 first MPMVA recorded
+PASS Case 4 eye 1 duochrome follows its MPMVA
+PASS Case 4 eye 1 duochrome
+PASS Case 4 eye 0 JCC only after both eyes' MPMVA
 PASS Case 4 eye 0 JCC APA ordered comparisons
 PASS Case 4 eye 0 JCC APA ordered comparisons
 PASS Case 4 eye 0 JCC APA ordered comparisons
 PASS Case 4 eye 0 JCC record
-PASS Changed lens invalidates final record
-PASS Case 4 eye 0 final MPMVA record
-PASS Case 4 OD then OS sequence
-PASS Case 4 eye 1 VA and PH
-PASS Case 4 eye 1 first MPMVA
-PASS Case 4 eye 1 duochrome
+PASS Case 4 eye 1 JCC only after both eyes' MPMVA
 PASS Case 4 eye 1 JCC APA ordered comparisons
 PASS Case 4 eye 1 JCC APA ordered comparisons
 PASS Case 4 eye 1 JCC APA ordered comparisons
 PASS Case 4 eye 1 JCC record
+PASS Case 4 eye 0 second MPMVA after both JCC records
+PASS Changed lens invalidates final record
+PASS Case 4 eye 0 final MPMVA record
+PASS Case 4 eye 1 second MPMVA after both JCC records
 PASS Changed lens invalidates final record
 PASS Case 4 eye 1 final MPMVA record
 PASS Case 4 completes the midterm workflow
@@ -133,25 +173,35 @@ PASS Case 5 eye 0 gross retinoscopy
 PASS Case 5 eye 1 gross retinoscopy
 PASS Case 5 WD must be deducted and recorded
 PASS Case 5 net retinoscopy
-PASS Case 5 OD then OS sequence
-PASS Case 5 eye 0 VA and PH
-PASS Case 5 eye 0 first MPMVA
+PASS Case 5 eye 0 net-RET VA in OD then OS order
+PASS Case 5 eye 0 VA starts from the net retinoscopy
+PASS Case 5 eye 0 RET VA recorded
+PASS Case 5 eye 1 net-RET VA in OD then OS order
+PASS Case 5 eye 1 VA starts from the net retinoscopy
+PASS Case 5 eye 1 RET VA recorded
+PASS Case 5 eye 0 first MPMVA before JCC
+PASS Case 5 eye 0 first MPMVA recorded
+PASS Case 5 eye 0 duochrome follows its MPMVA
 PASS Case 5 eye 0 duochrome
+PASS Case 5 eye 1 first MPMVA before JCC
+PASS Case 5 eye 1 first MPMVA recorded
+PASS Case 5 eye 1 duochrome follows its MPMVA
+PASS Case 5 eye 1 duochrome
+PASS Case 5 eye 0 JCC only after both eyes' MPMVA
 PASS Case 5 eye 0 JCC PPAP ordered comparisons
 PASS Case 5 eye 0 JCC PPAP ordered comparisons
 PASS Case 5 eye 0 JCC PPAP ordered comparisons
 PASS Case 5 eye 0 JCC PPAP ordered comparisons
 PASS Case 5 eye 0 JCC record
-PASS Changed lens invalidates final record
-PASS Case 5 eye 0 final MPMVA record
-PASS Case 5 OD then OS sequence
-PASS Case 5 eye 1 VA and PH
-PASS Case 5 eye 1 first MPMVA
-PASS Case 5 eye 1 duochrome
+PASS Case 5 eye 1 JCC only after both eyes' MPMVA
 PASS Case 5 eye 1 JCC APA ordered comparisons
 PASS Case 5 eye 1 JCC APA ordered comparisons
 PASS Case 5 eye 1 JCC APA ordered comparisons
 PASS Case 5 eye 1 JCC record
+PASS Case 5 eye 0 second MPMVA after both JCC records
+PASS Changed lens invalidates final record
+PASS Case 5 eye 0 final MPMVA record
+PASS Case 5 eye 1 second MPMVA after both JCC records
 PASS Changed lens invalidates final record
 PASS Case 5 eye 1 final MPMVA record
 PASS Case 5 completes the midterm workflow
@@ -162,28 +212,38 @@ PASS Case 6 eye 0 gross retinoscopy
 PASS Case 6 eye 1 gross retinoscopy
 PASS Case 6 WD must be deducted and recorded
 PASS Case 6 net retinoscopy
-PASS Case 6 OD then OS sequence
-PASS Case 6 eye 0 VA and PH
-PASS Case 6 eye 0 first MPMVA
+PASS Case 6 eye 0 net-RET VA in OD then OS order
+PASS Case 6 eye 0 VA starts from the net retinoscopy
+PASS Case 6 eye 0 RET VA recorded
+PASS Case 6 eye 1 net-RET VA in OD then OS order
+PASS Case 6 eye 1 VA starts from the net retinoscopy
+PASS Case 6 eye 1 RET VA recorded
+PASS Case 6 eye 0 first MPMVA before JCC
+PASS Case 6 eye 0 first MPMVA recorded
+PASS Case 6 eye 0 duochrome follows its MPMVA
 PASS Case 6 eye 0 duochrome
+PASS Case 6 eye 1 first MPMVA before JCC
+PASS Case 6 eye 1 first MPMVA recorded
+PASS Case 6 eye 1 duochrome follows its MPMVA
+PASS Case 6 eye 1 duochrome
+PASS Case 6 eye 0 JCC only after both eyes' MPMVA
 PASS Case 6 eye 0 JCC APA ordered comparisons
 PASS Case 6 eye 0 JCC APA ordered comparisons
 PASS Case 6 eye 0 JCC APA ordered comparisons
 PASS Case 6 eye 0 JCC record
-PASS Changed lens invalidates final record
-PASS Case 6 eye 0 final MPMVA record
-PASS Case 6 OD then OS sequence
-PASS Case 6 eye 1 VA and PH
-PASS Case 6 eye 1 first MPMVA
-PASS Case 6 eye 1 duochrome
+PASS Case 6 eye 1 JCC only after both eyes' MPMVA
 PASS Case 6 eye 1 JCC APA ordered comparisons
 PASS Case 6 eye 1 JCC APA ordered comparisons
 PASS Case 6 eye 1 JCC APA ordered comparisons
 PASS Case 6 eye 1 JCC record
+PASS Case 6 eye 0 second MPMVA after both JCC records
+PASS Changed lens invalidates final record
+PASS Case 6 eye 0 final MPMVA record
+PASS Case 6 eye 1 second MPMVA after both JCC records
 PASS Changed lens invalidates final record
 PASS Case 6 eye 1 final MPMVA record
 PASS Case 6 completes the midterm workflow
 PASS Case 6 full workflow scores 100
 PASS Exam allows progression and records unmet criteria without giving hints
 PASS An unattempted clinical case does not receive clinical points
-188 checks passed
+248 checks passed

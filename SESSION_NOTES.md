@@ -30,3 +30,19 @@
 - 使用者再次提醒「記得寫session note」，此檔為主要交接來源；發布與公開站驗收完成後必須接著更新此段，README/AGENTS/CLAUDE均已指向此檔。
 - 最終瀏覽器重新整理後，實際點擊「繼續上次練習」，恢復 stage16 / eye1 / completed=true / RX -1.50/-0.75x090。Tab病歷顯示雙眼Gross/Net/1st MPMVA/JCC/最終值與VA/PH，截圖 Reports/restored-records.jpg；狀態 Reports/restored-runtime-state.json。
 - 在病歷實際點擊「回到選單」，病歷/HUD已隱藏並顯示可用的繼續按鈕。最終網站與全部可編輯來源準備推送至指定 Mvmpa5555 main，發布仍須確認 Actions 成功與公開頁面載入。
+
+## 2026-10-15 下午：驗光儀重建、人物、PD 步驟、消毒動畫、光影
+
+- 綜合驗光儀依 Reichert Phoroptor 使用手冊 11625-101 的 Parts Identification 重建（Blender 自行建模，未用第三方網格）：中央橫桿＋安裝座、PD 鈕/水平鈕/水平氣泡/PD 刻度窗、額托鈕與額托、兩個鏡片筒（外側弱球面大轉盤、強球面環、輔助鏡片旋鈕與刻度、同心柱面度數內鈕/軸位外鈕與量角盤、窺孔軸位參考刻度、讀數窗正黑負紅）、轉盤（turret）帶 JCC 與旋轉稜鏡、角膜對位器、面罩。正面（旋鈕刻度）朝檢查者、背面（面罩、額托）朝受測者；後光學面 z=4.463，距瞳孔 12 mm。
+- 新增 PhoropterStand：立柱、可旋轉支臂（ArmSwing）、鎖定桿、檢查燈。Unity 執行時把 Phoropter 掛到 ArmSwing 下；stage0 支臂轉開 80°，做水平/桌高等準備或進入 stage1 時轉入。
+- 病人改成連續曲面頭部（參數化變形）＋覆蓋殼頭髮/眉毛/唇（埋入式邊界，避免鋸齒）、弧形眼瞼可眨眼、眼球可轉動注視、瀏海、身體/手指/腿用 loft 管狀網格。眼位依病例 TruePD 調整。
+- Unity：ClinicWorld 重寫——旋鈕直接操作（滑鼠指向發亮＋提示，滾輪/左右鍵）、旋鈕平滑驅動不鎖輸入、手部伸向實際旋鈕（左側用左手）；輔助鏡片 OC/PH 由內部鏡盤轉入窺孔；JCC 由轉盤轉入、與柱面軸齒輪連動、以手柄軸翻面。
+- PD：對應邊緣法。空白鍵指示→Q 閉右眼（相機移到檢查者左眼）→←→ 讓 0 對準 OD 瞳孔右緣（顳側）→Enter→E 閉左眼→讀 OS 瞳孔鼻側緣→Enter。讀數由實際眼位、注視方向與尺面幾何計算（含視差）。教學模式先要求消毒。
+- 消毒動畫：支臂轉開→雙手持酒精噴瓶噴在棉布上（霧粒子、按壓泵頭、音效）→擦額托、右/左面罩（背面，由內向外繞圈、水光粒子）→拿起 PD 尺擦正反兩面。QA 可用 `SendMessage('Clinic runtime','QATimeScale','0.3')` 慢動作檢查。
+- 檢影：光帶是帶狹縫 cookie 的聚光燈，拖曳滑鼠掃動；反射帶速度/寬度/亮度依殘餘度數，破裂現象依殘餘散光主子午線；考試模式不念順逆動。
+- 光影：Linear + HDR、ClinicPost（bloom、ACES、暗角）、窗光陰影（牆/天花板不投影）、檢查燈柔和陰影、檢查者側補光、執行時擷取房間 cubemap 作反射（不可把 Hidden/Cube* 加入 Always Included，會讓建置寫 unity_builtin_extra 失敗）。
+- 字型子集需 fonttools：`uv run --no-project --with fonttools python tools/subset_font.py`。
+- 驗證：ClinicBuild.Validate 188 項通過；WebGL 建置 Errors=0；verify-site 通過；瀏覽器 ?qa=1 完整自動流程 completed=true / missing=0（消毒、PD 64mm、9 項準備、雙眼檢影到第二次 MPMVA）。
+- 使用者提供期中紀錄單：流程改為「雙眼完成同一項才進下一項」。stage 表（RefractionModel StageEye/StagePhase）：4/5 右左眼淨檢影 VA、6/7 右眼 MPMVA+紅綠、8/9 左眼、10/11 右眼 JCC+紀錄、12/13 左眼、14/15 右左第二次 MPMVA。病歷與下載檔照紀錄單 ①②③④。Validate 擴為 248 項並檢查順序；瀏覽器 QA 實際走 4:0 5:1 6:0 7:0 8:1 … 14:0 15:1 16 completed、missing=0。
+- 平板：ClinicTouch.cs（全螢幕觸控板：拖曳轉頭/掃光帶、點物件互動；虛擬搖桿）、觸控按鈕列、點旋鈕出 −/＋ 列、PD 按鈕列、HUD 依比例貼齊上下緣、UI 依寬高比縮放、行動裝置降陰影/關 bloom、模板 touch-action:none。`?touch=1` 可強制觸控介面（iPadOS 回報桌面 UA 時，第一次觸控也會自動切換）。內建預覽瀏覽器的瞬間點擊（無滑鼠移動）不會觸發 uGUI，需先 mousemove；真實滑鼠/觸控正常。
+- 尚未：commit / push / Pages 上線驗證；實體平板（iPad Safari / Android Chrome）尚未實機測試。

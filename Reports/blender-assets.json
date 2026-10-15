@@ -1,17 +1,17 @@
 [
   {
     "asset": "Architecture",
-    "objects": 296,
+    "objects": 297,
     "source": "RefractionRoom.blend"
   },
   {
     "asset": "CleaningCloth",
-    "objects": 10,
+    "objects": 2,
     "source": "RefractionRoom.blend"
   },
   {
     "asset": "ClinicianHands",
-    "objects": 35,
+    "objects": 27,
     "source": "RefractionRoom.blend"
   },
   {
@@ -21,7 +21,7 @@
   },
   {
     "asset": "ExamChair",
-    "objects": 10,
+    "objects": 19,
     "source": "RefractionRoom.blend"
   },
   {
@@ -31,12 +31,12 @@
   },
   {
     "asset": "Patient",
-    "objects": 87,
+    "objects": 79,
     "source": "RefractionRoom.blend"
   },
   {
     "asset": "PDRuler",
-    "objects": 38,
+    "objects": 5,
     "source": "RefractionRoom.blend"
   },
   {
@@ -46,7 +46,12 @@
   },
   {
     "asset": "Phoropter",
-    "objects": 160,
+    "objects": 184,
+    "source": "RefractionRoom.blend"
+  },
+  {
+    "asset": "PhoropterStand",
+    "objects": 15,
     "source": "RefractionRoom.blend"
   },
   {
@@ -56,12 +61,12 @@
   },
   {
     "asset": "Retinoscope",
-    "objects": 11,
+    "objects": 15,
     "source": "RefractionRoom.blend"
   },
   {
     "asset": "Sanitizer",
-    "objects": 4,
+    "objects": 9,
     "source": "RefractionRoom.blend"
   }
 ]

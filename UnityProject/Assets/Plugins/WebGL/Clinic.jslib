@@ -7,11 +7,13 @@ mergeInto(LibraryManager.library, {
  },
  ClinicSpeak: function(ptr) {
   var text=UTF8ToString(ptr);
-  if(!window.speechSynthesis)return;
+  try{
+  if(!window.speechSynthesis||!window.SpeechSynthesisUtterance)return;
   window.speechSynthesis.cancel();
   var speech=new SpeechSynthesisUtterance(text);speech.lang='zh-TW';speech.rate=1;
   var voices=window.speechSynthesis.getVoices();var voice=voices.find(function(v){return v.lang==='zh-TW';})||voices.find(function(v){return v.lang.indexOf('zh')===0;});if(voice)speech.voice=voice;
   window.speechSynthesis.speak(speech);
+  }catch(e){}
  },
  ClinicDownload: function(name,text){
   var blob=new Blob([UTF8ToString(text)],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=UTF8ToString(name);a.click();setTimeout(function(){URL.revokeObjectURL(url);},10000);

@@ -38,3 +38,10 @@
 - 此次最終載入之後無新增 console errors。
 - 重新整理後實際點擊繼續，恢復 stage16 / completed=true 與 OS -1.50/-0.75×090；Tab病歷的雙眼紀錄均保留，見 restored-runtime-state.json / restored-records.jpg。病歷的返回選單也已實際點擊驗證。
 - Git commit、Actions 與 Pages 上線證據接著補記。
+
+## 2026-10-15 下午重建（驗光儀／人物／PD／消毒／光影）
+
+- `ClinicBuild.Validate` 188 項通過；Unity 6000.6.5f1 WebGL 建置成功、Errors=0；`node tools/verify-site.mjs` 通過。
+- 本機 Chrome 內建瀏覽器 `?qa=1` 完整自動流程：消毒動畫→PD 對應邊緣法（記錄 64 mm）→9 項準備→雙眼檢影、WD、VA/PH、霧視 MPMVA、紅綠、JCC APA/PPAP、第二次 MPMVA，最終 `completed=true / missing=0`。
+- 以截圖人工檢查：驗光儀正面朝檢查者、背面面罩/額托朝受測者；PD 尺在鼻樑前、刻度可讀；消毒動畫雙手持噴瓶與棉布、擦額托與面罩；檢影窺孔顯示瞳孔反射。
+- 限制：人物仍為風格化程式建模，非照片擬真；動作為程式動畫非動作捕捉。尚未推送與公開站驗收。
