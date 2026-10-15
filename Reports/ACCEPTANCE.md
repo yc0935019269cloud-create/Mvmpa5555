@@ -56,3 +56,9 @@
 
 - Validate 254 項 PASS（新增：紅綠終點為第一次綠色、四方向 P 只在隱藏負柱軸選紅點、隨機病例 400 組皆在範圍內）。
 - WebGL Succeeded、Errors 0；verify-site 通過；瀏覽器 ?qa=1 完整流程 PASS_FULL_MIDTERM_FLOW、missing=0。
+
+## 2026-10-16 平板與新手教學
+
+- 以 Chrome headless 模擬 iPad（1194×834、834×1194、iPad UA、真觸控事件）操作：搖桿、拖曳轉頭、點物件、旋鈕 −／＋、遙控器、檢影掃動、病歷、選單皆可用；新手操作教學 31 步全部走完並回主選單。
+- 同環境 ?qa=1 完整流程 completed、missing=0；Validate 254 項；WebGL Errors 0；verify-site 通過。
+- 未做：實體 iPad／Android 平板實機測試。

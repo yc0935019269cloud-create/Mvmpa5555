@@ -497,7 +497,11 @@ namespace RefractionRoom {
   }
   public void Resume(){if(!PlayerPrefs.HasKey("ClinicSession"))return;session=JsonUtility.FromJson<ClinicSession>(PlayerPrefs.GetString("ClinicSession"));remoteOwned=PlayerPrefs.GetInt("ClinicRemote",0)==1||session.prepared[6];projectorOn=true;if(session.stage>0)session.phoropterIn=true;begun=true;paused=false;notebook=false;focused=false;patientView=false;busy=false;Time.timeScale=1;pdStep=-1;cinematic=false;walkPos=new Vector3(.6f,1.65f,.3f);view.transform.position=walkPos;view.transform.rotation=Quaternion.identity;yaw=0;pitch=0;targetFov=66;hands.gameObject.SetActive(true);ui.menu.SetActive(false);ApplyPatient();SyncMechanics(true);DrawChart();Lock();Toast("已恢復病例與教學進度。");}
   void LoadProgress(){ui.canResume=PlayerPrefs.HasKey("ClinicSession");}
-  public void SaveProgress(){if(begun){PlayerPrefs.SetInt("ClinicRemote",remoteOwned?1:0);PlayerPrefs.SetString("ClinicSession",JsonUtility.ToJson(session));PlayerPrefs.Save();if(ui)ui.canResume=true;}}
+  public void SaveProgress(){if(ui&&ui.guideOn)return;if(begun){PlayerPrefs.SetInt("ClinicRemote",remoteOwned?1:0);PlayerPrefs.SetString("ClinicSession",JsonUtility.ToJson(session));PlayerPrefs.Save();if(ui)ui.canResume=true;}}
+  // new-player walkthrough helpers
+  public void GuideWalkTo(Vector3 p,Vector3 lookAt){if(focused){focused=false;targetFov=66;}Vector3 d=lookAt-p;yaw=Mathf.Atan2(d.x,d.z)*Mathf.Rad2Deg;pitch=-Mathf.Atan2(d.y,new Vector2(d.x,d.z).magnitude)*Mathf.Rad2Deg;walkPos=p;GoTo(p,Quaternion.Euler(pitch,yaw,0));}
+  public void GuideResetScene(){session=new ClinicSession();remoteOwned=false;held=0;SyncMechanics(true);DrawChart();}
+  public void GuidePrepareStage(int st){for(int i=0;i<9;i++)session.prepared[i]=true;session.phoropterIn=true;session.stage=st;session.EnterStage();session.jccMode=0;session.occluded=true;remoteOwned=true;projectorOn=true;if(held==1){ReturnTools();held=0;}SyncMechanics(true);DrawChart();if(focused)GoTo(FocusPoint(),Quaternion.identity);}
   public void PointerState(string state){lookCaptured=state=="1";}
   public void Lock(){
    if(touchMode)return;
@@ -516,7 +520,7 @@ namespace RefractionRoom {
   }
   public void Focus(){
    if(busy||pdStep>=0)return;if(patientView){PatientPOV();return;}
-   if(!focused){if(Vector3.Distance(view.transform.position,new Vector3(0,1.445f,4.23f))>3.2f){Toast("先走近受測者與驗光儀，再按 F 坐近。");return;}returnPos=walkPos;focused=true;Release();GoTo(FocusPoint(),Quaternion.identity);targetFov=FocusFov();Toast(session.phoropterIn?"坐近操作 · 滑鼠指向旋鈕：滾輪轉動、左鍵＋右鍵−；F 回診間。":"驗光儀還轉在一旁；做水平、桌高等準備時會自動轉到受測者眼前。");}
+   if(!focused){if(Vector3.Distance(view.transform.position,new Vector3(0,1.445f,4.23f))>3.2f){Toast(touchMode?"先用搖桿走近受測者與驗光儀，再點「坐近驗光儀」。":"先走近受測者與驗光儀，再按 F 坐近。");return;}returnPos=walkPos;focused=true;Release();GoTo(FocusPoint(),Quaternion.identity);targetFov=FocusFov();Toast(session.phoropterIn?(touchMode?"坐近操作 · 點儀器上的旋鈕，下方出現 − ／ ＋；「回診間」離開。":"坐近操作 · 滑鼠指向旋鈕：滾輪轉動、左鍵＋右鍵−；F 回診間。"):"驗光儀還轉在一旁；做水平、桌高等準備時會自動轉到受測者眼前。");}
    else{focused=false;GoTo(returnPos,Quaternion.Euler(pitch,yaw,0));targetFov=66;Lock();}
    DrawChart();
   }
@@ -551,7 +555,7 @@ namespace RefractionRoom {
    Toast(inFront?"把綜合驗光儀轉到受測者眼前。":"把綜合驗光儀轉開到一旁。");
    yield return new WaitForSeconds(1.5f);busy=was;
   }
-  public void HoldRet(){if(busy||pdStep>=0)return;if(held==1){ReturnTools();held=0;targetFov=focused?FocusFov():66;Toast("已放回檢影鏡。");}else{HoldTool("Retinoscope");held=1;Toast("檢影鏡已拿起。F 坐近後：按住左鍵拖曳滑鼠掃動光帶，Z / X 旋轉光帶。");if(focused){GoTo(FocusPoint(),Quaternion.identity);targetFov=FocusFov();}}session.Log("拿取／放回檢影鏡");}
+  public void HoldRet(){if(busy||pdStep>=0)return;if(held==1){ReturnTools();held=0;targetFov=focused?FocusFov():66;Toast("已放回檢影鏡。");}else{HoldTool("Retinoscope");held=1;Toast(touchMode?"檢影鏡已拿起。坐近後沿窺孔畫面的金色線方向拖曳掃動光帶，+90° 換另一條子午線。":"檢影鏡已拿起。F 坐近後：按住左鍵拖曳滑鼠掃動光帶，Z / X 旋轉光帶。");if(focused){GoTo(FocusPoint(),Quaternion.identity);targetFov=FocusFov();}}session.Log("拿取／放回檢影鏡");}
   void HoldTool(string name){ReturnTools();var t=N(name);if(!t)return;t.SetParent(view.transform,true);t.localPosition=new Vector3(.16f,-.19f,.37f);t.localRotation=name=="PDRuler"?Quaternion.Euler(-60,0,8):name=="CleaningCloth"?Quaternion.Euler(-40,0,0):Quaternion.Euler(0,180,8);}
   void ReturnTools(){foreach(var kv in tools){var t=kv.Value.transform;t.SetParent(models,true);t.position=homePos[kv.Key]+Vector3.up*session.height;t.rotation=homeRot[kv.Key];}var pump=N("SanitizerPump");if(pump)pump.localPosition=homePos["SanitizerPump"];}
   public void Adjust(int sign){if(!focused)return;AdjustControl(session.eye,parameter,sign,1);}

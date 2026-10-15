@@ -6,7 +6,7 @@ using UnityEngine.Events;
 using UnityEngine.EventSystems;
 
 namespace RefractionRoom {
- public class ClinicUI : MonoBehaviour {
+ public partial class ClinicUI : MonoBehaviour {
   public ClinicWorld world;
   public GameObject menu;
   public bool voice=true,canResume,hints=true,immersive;
@@ -34,7 +34,7 @@ namespace RefractionRoom {
     if(System.Array.IndexOf(Striped,name)>=0){var st=new GameObject(name+" accent",typeof(RectTransform),typeof(Image));Rect(st,g.transform,0,h*.5f-3,w-36,3,new Vector2(.5f,.5f));st.GetComponent<Image>().color=new Color(accent.r,accent.g,accent.b,.85f);st.GetComponent<Image>().raycastTarget=false;}}
    return g;}
   Text Txt(string name,Transform parent,string text,float x,float y,float w,float h,int size,Color color,Vector2 anchor,TextAnchor align=TextAnchor.MiddleLeft){var g=new GameObject(name,typeof(RectTransform),typeof(Text));Rect(g,parent,x,y,w,h,anchor);var t=g.GetComponent<Text>();t.font=font;t.fontSize=size;t.text=text;t.color=color;t.alignment=align;t.horizontalOverflow=HorizontalWrapMode.Wrap;t.verticalOverflow=VerticalWrapMode.Truncate;t.supportRichText=true;t.raycastTarget=false;return t;}
-  Button Btn(string name,Transform parent,string text,float x,float y,float w,float h,UnityAction callback,bool main=false){var g=Panel(name,parent,x,y,w,h,new Vector2(.5f,.5f),main?accent:lighter);var b=g.AddComponent<Button>();ColorBlock cb=b.colors;cb.normalColor=Color.white;cb.highlightedColor=new Color(1.22f,1.2f,1.12f);cb.pressedColor=new Color(.75f,.82f,.78f);cb.fadeDuration=.08f;cb.disabledColor=new Color(.38f,.45f,.4f);b.colors=cb;b.onClick.AddListener(callback);Txt(name+" label",g.transform,text,0,0,w-12,h,18,main?dark:pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);return b;}
+  Button Btn(string name,Transform parent,string text,float x,float y,float w,float h,UnityAction callback,bool main=false){var g=Panel(name,parent,x,y,w,h,new Vector2(.5f,.5f),main?accent:lighter);var b=g.AddComponent<Button>();ColorBlock cb=b.colors;cb.normalColor=Color.white;cb.highlightedColor=new Color(1.22f,1.2f,1.12f);cb.pressedColor=new Color(.75f,.82f,.78f);cb.fadeDuration=.08f;cb.disabledColor=new Color(.38f,.45f,.4f);b.colors=cb;b.onClick.AddListener(callback);b.onClick.AddListener(()=>NoteClick(name));var lt=Txt(name+" label",g.transform,text,0,0,w-12,h,18,main?new Color(.05f,.06f,.06f,1):pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);if(main)lt.fontStyle=FontStyle.Bold;return b;}
   public void Build(Font f,Texture scope){
    font=f;var canvas=new GameObject("Clinic UI",typeof(Canvas),typeof(CanvasScaler),typeof(GraphicRaycaster));canvas.GetComponent<Canvas>().renderMode=RenderMode.ScreenSpaceOverlay;scaler=canvas.GetComponent<CanvasScaler>();scaler.uiScaleMode=CanvasScaler.ScaleMode.ScaleWithScreenSize;scaler.referenceResolution=new Vector2(1600,900);scaler.matchWidthOrHeight=.5f;root=canvas.transform;
    if(!FindFirstObjectByType<EventSystem>()){new GameObject("EventSystem",typeof(EventSystem),typeof(StandaloneInputModule));}
@@ -51,7 +51,8 @@ namespace RefractionRoom {
    Btn("tutorial",card.transform,"進入診間  /  教學",0,-152,550,58,()=>world.Begin("教學"),true);
    Btn("free",card.transform,"自由練習",-142,-218,266,50,()=>world.Begin("自由"));
    Btn("exam",card.transform,"期中考試 · 18 分鐘",142,-218,266,50,()=>{hints=false;world.Begin("考試");});
-   resume=Btn("resume",card.transform,"繼續上次練習",0,-277,550,45,()=>world.Resume());
+   Btn("guide start",card.transform,"新手操作教學",-142,-277,266,45,()=>StartGuide(),true);
+   resume=Btn("resume",card.transform,"繼續上次練習",142,-277,266,45,()=>world.Resume());
    Txt("menu help",card.transform,"WASD 移動 · 滑鼠轉頭 · E 互動 · F 坐近\nEsc 釋放滑鼠 · Tab 病歷 · 建議電腦全螢幕",0,-349,550,70,17,muted,new Vector2(.5f,.5f));
    Txt("model label",menu.transform,"UNITY × BLENDER\n第一人稱視光練習",485,-337,450,90,20,pale,new Vector2(.5f,.5f),TextAnchor.LowerRight);
 
@@ -112,7 +113,7 @@ namespace RefractionRoom {
    remoteStatus=Txt("Remote display",face.transform,"",0,140,150,45,14,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
    string[] charts={"E 字","紅綠","點陣"};
    for(int i=0;i<3;i++){int c=i;var b=Btn("remote chart "+i,face.transform,charts[i],-52+i*52,89,48,43,()=>world.ChangeChart(c));b.GetComponent<Image>().color=new Color(.68f,.67f,.61f);b.GetComponentInChildren<Text>().color=dark;}
-   for(int i=0;i<Optics.Rows.Length;i++){float row=Optics.Rows[i];int col=i%3,r=i/3;var b=Btn("remote VA "+row,face.transform,row.ToString("0.0"),-52+col*52,40-r*32,48,28,()=>world.RemoteRow(row));b.GetComponentInChildren<Text>().fontSize=14;b.GetComponent<Image>().color=new Color(.70f,.70f,.66f);b.GetComponentInChildren<Text>().color=dark;}
+   for(int i=0;i<Optics.Rows.Length;i++){float row=Optics.Rows[i];int col=i%4,r=i/4;var b=Btn("remote VA "+row,face.transform,row.ToString("0.0"),-57+col*38,40-r*32,35,28,()=>world.RemoteRow(row));b.GetComponentInChildren<Text>().fontSize=14;b.GetComponent<Image>().color=new Color(.70f,.70f,.66f);b.GetComponentInChildren<Text>().color=dark;}
    Btn("remote larger",face.transform,"大 ↑",-40,-109,72,34,()=>world.Row(-1));
    Btn("remote smaller",face.transform,"小 ↓",40,-109,72,34,()=>world.Row(1));
    Btn("remote reset",face.transform,"復位",-40,-147,72,30,()=>world.RemoteReset());
@@ -164,7 +165,7 @@ namespace RefractionRoom {
    knobBar=Panel("Knob bar",hud.transform,160,-118,700,74,new Vector2(.5f,.5f),dark);
    Btn("knob minus",knobBar.transform,"−",-300,0,90,62,()=>world.TouchStep(-1));
    Btn("knob plus",knobBar.transform,"+",205,0,90,62,()=>world.TouchStep(1),true);
-   Btn("knob close",knobBar.transform,"✕",305,0,62,62,()=>world.touchSel="");
+   Btn("knob close",knobBar.transform,"關",305,0,62,62,()=>world.touchSel="");
    knobLabel=Txt("knob label",knobBar.transform,"",-45,0,400,70,16,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
    // closed-eye cue while measuring PD: the side of the examiner's closed eye is dimmed
    shadeL=Panel("Closed left eye",hud.transform,-660,0,340,3000,new Vector2(.5f,.5f),new Color(0,0,0,.55f));shadeL.GetComponent<Image>().raycastTarget=false;
@@ -214,6 +215,7 @@ namespace RefractionRoom {
    Refresh();
   }
   void Update(){
+   GuideUpdate();
    if(!world||!retPanel||!retPanel.activeSelf||sweepAxis==null)return;var s=world.session;
    float ang=s.streak+90;sweepAxis.localRotation=Quaternion.Euler(0,0,ang);
    Vector2 d=new Vector2(Mathf.Cos(ang*Mathf.Deg2Rad),Mathf.Sin(ang*Mathf.Deg2Rad));sweepDot.anchoredPosition=new Vector2(0,45)+d*world.sweep*120;
@@ -222,13 +224,19 @@ namespace RefractionRoom {
   Sprite RemoteShape(){int n=64,r=12;var tex=new Texture2D(n,n,TextureFormat.RGBA32,false);for(int y=0;y<n;y++)for(int x=0;x<n;x++){float dx=Mathf.Max(r-x,0,x-(n-1-r)),dy=Mathf.Max(r-y,0,y-(n-1-r));tex.SetPixel(x,y,new Color(1,1,1,Mathf.Clamp01(r-Mathf.Sqrt(dx*dx+dy*dy))));}tex.Apply();return Sprite.Create(tex,new UnityEngine.Rect(0,0,n,n),new Vector2(.5f,.5f),100,0,SpriteMeshType.FullRect,new Vector4(r,r,r,r));}
   void Place(string n,float x,float y){((RectTransform)station.transform.Find(n)).anchoredPosition=new Vector2(x,y);}
   void CaseLabel(){if(selectedPatient==0){patientChoice.text="隨機病患（19–21 歲）";return;}var s=new ClinicSession();s.patient=selectedPatient;patientChoice.text="病例 "+selectedPatient.ToString("00")+"  /  "+s.PatientName;}
-  public void Refresh(){if(!world||!root)return;scaler.matchWidthOrHeight=Screen.height>0&&(float)Screen.width/Screen.height<1.7f?0:1;var s=world.session;bool play=world.begun;hud.SetActive(play);book.SetActive(play&&world.notebook);pausedPanel.SetActive(play&&world.paused);resume.interactable=canResume;
+  // On tablets the keyboard shortcuts in labels are noise: strip them once touch is detected.
+  bool touchLabels;Text portraitHint;
+  void ApplyTouchLabels(){touchLabels=true;var key=new System.Text.RegularExpressions.Regex(@"\s+(空白鍵|Enter|Tab|[A-Z])$");
+   foreach(var b in root.GetComponentsInChildren<Button>(true)){var t=b.GetComponentInChildren<Text>(true);if(!t)continue;if(t.text=="Esc"){t.text="選單";continue;}t.text=key.Replace(t.text,"");}
+   foreach(var t in root.GetComponentsInChildren<Text>(true)){if(t.name=="walk help")t.text="左下搖桿走路 · 拖曳畫面轉頭 · 點物件互動 · 右下按鈕坐近驗光儀";if(t.name=="menu help")t.text="平板：左下搖桿走路、拖曳轉頭、點物件互動；建議橫放並開全螢幕";if(t.name=="station help")t.text="直接點儀器上的旋鈕，下方出現 − ／ ＋ 調整（外側大轉盤＝球面、內鈕＝柱面、外圈＝軸位、上方小鈕＝輔助鏡片）";}
+   portraitHint=Txt("portrait hint",root,"建議把平板橫放，按鈕會比較大、比較好點",0,360,900,40,22,accent,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);}
+  public void Refresh(){if(!world||!root)return;if(world.touchMode&&!touchLabels)ApplyTouchLabels();if(portraitHint)portraitHint.gameObject.SetActive(Screen.height>Screen.width);scaler.matchWidthOrHeight=Screen.height>0&&(float)Screen.width/Screen.height<1.7f?0:1;var s=world.session;bool play=world.begun;hud.SetActive(play);book.SetActive(play&&world.notebook);pausedPanel.SetActive(play&&world.paused);resume.interactable=canResume;
    if(!world.paused&&abandonConfirm)abandonConfirm.SetActive(false);if(volumeLabel)volumeLabel.text="背景音樂音量  "+Mathf.RoundToInt(world.musicVolume*100)+"%";
    if(!play)return;
    task.text=s.StageTitle;step.text="STEP "+(s.stage+1).ToString("00")+" / 17  ·  "+s.mode;
    task.transform.parent.gameObject.SetActive(!immersive&&!world.cinematic);
    patient.text=s.PatientName+(s.patient==0?"":" · 病例 "+s.patient.ToString("00"))+" · "+s.EyeName;
-   string wdLabel=s.wdCm+" cm · "+Optics.WD(s.wdCm).ToString("0.00")+" D";if(wdPrepText)wdPrepText.text=wdLabel;if(wdChip){wdChip.GetComponentInChildren<Text>().text="工作距離 "+s.wdCm+" cm";foreach(var b in wdOpts){bool on=b.name=="wd opt "+s.wdCm;b.GetComponent<Image>().color=on?accent:lighter;b.GetComponentInChildren<Text>().color=on?dark:pale;}if(wdHint)wdHint.text=s.wdRemoved?"已從兩眼扣除工作距離，要改請重新開始病例":"目前 "+wdLabel+"，檢影後從兩眼球面扣除";}if(wdText)wdText.text=s.wdCm+"cm";
+   string wdLabel=s.wdCm+" cm · "+Optics.WD(s.wdCm).ToString("0.00")+" D";if(wdPrepText)wdPrepText.text=wdLabel;if(wdChip){wdChip.GetComponentInChildren<Text>().text="工作距離 "+s.wdCm+" cm";foreach(var b in wdOpts){bool on=b.name=="wd opt "+s.wdCm;b.GetComponent<Image>().color=on?accent:lighter;b.GetComponentInChildren<Text>().color=on?new Color(.05f,.06f,.06f,1):pale;b.GetComponentInChildren<Text>().fontStyle=on?FontStyle.Bold:FontStyle.Normal;}if(wdHint)wdHint.text=s.wdRemoved?"已從兩眼扣除工作距離，要改請重新開始病例":"目前 "+wdLabel+"，檢影後從兩眼球面扣除";}if(wdText)wdText.text=s.wdCm+"cm";
    int sec=Mathf.FloorToInt(s.mode=="考試"?Mathf.Max(0,1080-s.seconds):s.seconds);clock.text=(s.mode=="考試"?"剩餘 ":"練習 ")+string.Format("{0:00}:{1:00}",sec/60,sec%60)+"  /  六公尺視標";
    var missing=s.Missing();mission.text=s.mode=="考試"?"依期中檢查流程獨立操作。\n完成時按 Enter 前往下一階段。":missing.Count==0?"✓ 這一步的條件已完成。\n按 Enter 前往下一步。":string.Join("\n",missing.GetRange(0,Mathf.Min(4,missing.Count)).ConvertAll(x=>"・"+x));
    next.interactable=!world.busy&&(missing.Count==0||s.mode=="自由"||s.mode=="考試");
