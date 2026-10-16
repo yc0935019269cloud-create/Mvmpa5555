@@ -22,7 +22,7 @@ namespace RefractionRoom {
   Vector3 guideStartPos,guideStartFwd;float guideStartSph,guideDoneAt=-1;bool guideStartOcc;int guideStartReads;bool guideSeenPicker;
 
   public void StartGuide(){
-   selectedPatient=1;CaseLabel();guideOn=true;world.Begin("自由");world.session.mode="自由";hints=true;
+   selectedPatient=1;CaseLabel();guideOn=true;world.Begin("教學");hints=true;
    BuildGuideSteps();guideIndex=-1;GuideGo(0);
   }
   public void StopGuide(){if(guideOn&&world)world.GuideResetScene();guideOn=false;if(guideCard){guideCard.SetActive(false);guideArrow.SetActive(false);guideFrame.SetActive(false);}}
@@ -87,7 +87,7 @@ namespace RefractionRoom {
    if(!string.IsNullOrEmpty(g.ui)){var rt=FindUI(g.ui);if(rt&&rt.gameObject.activeInHierarchy){Vector3[] c=new Vector3[4];rt.GetWorldCorners(c);Vector2 a,b;var rr=(RectTransform)root;
      RectTransformUtility.ScreenPointToLocalPointInRectangle(rr,c[0],null,out a);RectTransformUtility.ScreenPointToLocalPointInRectangle(rr,c[2],null,out b);at=(a+b)/2;size=new Vector2(Mathf.Abs(b.x-a.x),Mathf.Abs(b.y-a.y));}}
    if(at==null&&g.world!=null){var wp=g.world();if(wp.HasValue){Vector3 sp=world.view.WorldToScreenPoint(wp.Value);if(sp.z>0){Vector2 l;RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform)root,sp,null,out l);at=l;size=new Vector2(110,110);}}}
-   bool show=at.HasValue&&!world.paused||(at.HasValue&&g.ui!=null&&g.ui.StartsWith("continue"));
+   bool show=at.HasValue&&!world.paused&&!world.cinematic||(at.HasValue&&g.ui!=null&&g.ui.StartsWith("continue"));
    guideFrame.SetActive(show);guideArrow.SetActive(show);
    float bob=Mathf.Sin(Time.unscaledTime*6)*10;
    if(show){var p=at.Value;var fr=(RectTransform)guideFrame.transform;fr.anchoredPosition=p;fr.sizeDelta=size+new Vector2(26,26)*(1+.08f*Mathf.Sin(Time.unscaledTime*6));
@@ -115,9 +115,23 @@ namespace RefractionRoom {
    s.Add(new GuideStep{title="選你的工作距離",ui="WD picker",desk="選一個距離（例如 57 cm＝1.75 D）。檢影完會從兩眼球面扣掉這個度數。",touch="點一個距離（例如 57 cm＝1.75 D）。檢影完會從兩眼球面扣掉這個度數。",done=()=>{if(wdPicker.activeSelf)guideSeenPicker=true;return guideSeenPicker&&!wdPicker.activeSelf;}});
    s.Add(new GuideStep{title="診間準備清單",ui="Preparation",desk="開始驗光前要完成九項準備：消毒、量 PD、水平、輔助鏡歸 O、打開窺孔、桌高與頂點距離、紅綠大 E、鎖定支臂、調暗燈光。可以直接點清單，或走到物件旁互動。",touch="開始驗光前要完成九項準備：消毒、量 PD、水平、輔助鏡歸 O、打開窺孔、桌高與頂點距離、紅綠大 E、鎖定支臂、調暗燈光。可以直接點清單，或走到物件旁互動。"});
    s.Add(new GuideStep{title="拿桌上的工具",world=()=>TargetPos("remote"),desk="我帶你走到桌邊了。對準發亮的「視標遙控器」按 E 拿起來。酒精棉布、PD 尺、檢影鏡也都在這張桌上，用一樣的方法拿。",touch="我帶你走到桌邊了。點一下發亮的「視標遙控器」拿起來（或對準後點右下「互動」）。酒精棉布、PD 尺、檢影鏡也都在這張桌上。",enter=()=>world.GuideWalkTo(new Vector3(.62f,1.62f,3.42f),TargetPos("remote")??new Vector3(.76f,.99f,3.96f)),done=()=>world.remoteOwned});
-   s.Add(new GuideStep{title="消毒與量 PD",world=()=>TargetPos("pd"),desk="正式練習時：拿酒精棉布走到受測者旁按 E，會播放噴酒精、擦額托與面罩的動畫；再拿 PD 尺按 E 進入量瞳距（請看我的這隻眼睛、閉眼、對 0、讀數）。",touch="正式練習時：拿酒精棉布走到受測者旁點互動，會播放消毒動畫；再拿 PD 尺點互動進入量瞳距，下方會出現專用按鈕。"});
-   s.Add(new GuideStep{title="坐到驗光儀前",ui="t focus",desk="按 F 坐近驗光儀（再按一次 F 會回到診間）。",touch="點「坐近驗光儀」。",enter=()=>world.GuidePrepareStage(4),done=()=>world.focused});
-   s.Add(new GuideStep{title="轉動旋鈕",world=()=>TargetPos("sph:0"),desk="滑鼠指向發亮的球面大轉盤：滾輪轉動，或左鍵＋0.25、右鍵−0.25。現在把右眼球面轉一格。",touch="點發亮的球面大轉盤，下方會出現「−／＋」按鈕，點一下改 0.25 D。",done=()=>Mathf.Abs(world.session.eyes[0].lens.s-guideStartSph)>.1f||Mathf.Abs(world.session.H.lens.s-guideStartSph)>.1f});
+   s.Add(new GuideStep{title="① 消毒儀器與 PD 尺",ui="prep0",desk="點清單第一項「消毒儀器與 PD 尺」（或拿桌上的酒精棉布走到受測者旁按 E）。看完噴酒精、擦額托、面罩和 PD 尺的動畫。",touch="點清單第一項「消毒儀器與 PD 尺」（或拿桌上的酒精棉布走到受測者旁點互動）。看完噴酒精、擦額托、面罩和 PD 尺的動畫。",done=()=>world.session.prepared[0]});
+   s.Add(new GuideStep{title="② 量瞳距：開始",ui="prep1",desk="點「量瞳距並設定 PD」（或拿 PD 尺到受測者旁按 E）。PD 尺會放上受測者鼻樑。",touch="點「量瞳距並設定 PD」（或拿 PD 尺到受測者旁點互動）。PD 尺會放上受測者鼻樑。",done=()=>world.pdStep>=0||world.session.prepared[1]});
+   s.Add(new GuideStep{title="② 量瞳距：請他看你",ui="pd say",desk="先告訴受測者「請看我的這隻眼睛」：點①（或空白鍵）。",touch="先告訴受測者「請看我的這隻眼睛」：點①。",done=()=>world.pdStep>=1||world.session.prepared[1]});
+   s.Add(new GuideStep{title="② 量瞳距：閉右眼",ui="pd right",desk="你閉右眼、用左眼看受測者的右眼：點②（或 Q）。",touch="你閉右眼、用左眼看受測者的右眼：點②。",done=()=>world.pdStep>=2||world.session.prepared[1]});
+   s.Add(new GuideStep{title="② 量瞳距：對零點",ui="pd ok",desk="用 ◀ ▶（或方向鍵）移動 PD 尺，讓 0 對準受測者右眼瞳孔的右緣（顳側），對好按「確認」（Enter）。沒對準會告訴你差幾 mm。",touch="用 ◀ ▶ 移動 PD 尺，讓 0 對準受測者右眼瞳孔的右緣（顳側），對好點「確認」。沒對準會告訴你差幾 mm。",done=()=>world.pdStep>=3||world.session.prepared[1]});
+   s.Add(new GuideStep{title="② 量瞳距：閉左眼",ui="pd left",desk="換眼：你閉左眼、改用右眼看受測者的左眼：點④（或 E）。",touch="換眼：你閉左眼、改用右眼看受測者的左眼：點④。",done=()=>world.pdStep>=4||world.session.prepared[1]});
+   s.Add(new GuideStep{title="② 量瞳距：讀數",ui="pd ok",desk="看受測者左眼瞳孔靠鼻側的邊緣對到哪一格，用 ◀ ▶ 選數值，按「確認」記錄 PD。",touch="看受測者左眼瞳孔靠鼻側的邊緣對到哪一格，用 ◀ ▶ 選數值，點「確認」記錄 PD。",done=()=>world.session.prepared[1]});
+   s.Add(new GuideStep{title="坐到驗光儀前",ui="t focus",desk="按 F 坐近驗光儀（再按一次 F 會回到診間）。剩下的準備要坐近才做得到。",touch="點「坐近驗光儀」。剩下的準備要坐近才做得到。",done=()=>world.focused});
+   s.Add(new GuideStep{title="③ 調整水平",ui="prep2",desk="點「調整水平」：驗光儀會轉到受測者眼前，轉水平鈕讓氣泡置中。",touch="點「調整水平」：驗光儀會轉到受測者眼前，轉水平鈕讓氣泡置中。",done=()=>world.session.prepared[2]});
+   s.Add(new GuideStep{title="④ 輔助鏡歸 O",ui="prep3",desk="點「輔助鏡歸 O」：兩眼輔助鏡片都轉回 O（開放）。",touch="點「輔助鏡歸 O」：兩眼輔助鏡片都轉回 O（開放）。",done=()=>world.session.prepared[3]});
+   s.Add(new GuideStep{title="⑤ 打開雙眼窺孔",ui="prep4",desk="點「打開雙眼窺孔」。",touch="點「打開雙眼窺孔」。",done=()=>world.session.prepared[4]});
+   s.Add(new GuideStep{title="⑥ 桌高與頂點距離",ui="prep5",desk="點「調整桌高與頂點距離」：桌子升降到合適高度、額托調到頂點距離 12 mm。",touch="點「調整桌高與頂點距離」：桌子升降到合適高度、額托調到頂點距離 12 mm。",done=()=>world.session.prepared[5]});
+   s.Add(new GuideStep{title="⑦ 設定紅綠大 E",ui="prep6",desk="點「設定紅綠大 E」：投影機切到紅綠視標。",touch="點「設定紅綠大 E」：投影機切到紅綠視標。",done=()=>world.session.prepared[6]});
+   s.Add(new GuideStep{title="⑧ 鎖定支臂",ui="prep7",desk="點「鎖定支臂」：扳下鎖定桿，驗光儀不會再晃。",touch="點「鎖定支臂」：扳下鎖定桿，驗光儀不會再晃。",done=()=>world.session.prepared[7]});
+   s.Add(new GuideStep{title="⑨ 調暗燈光",ui="prep8",desk="點「調暗燈光」：檢影需要暗室。",touch="點「調暗燈光」：檢影需要暗室。",done=()=>world.session.prepared[8]});
+   s.Add(new GuideStep{title="準備完成",ui="next",desk="九項都打勾了。點「完成此步驟」（Enter）進入檢影；教學模式會檢查有沒有漏做。之後想直接練主觀驗光，可以按任務卡上的「跳過檢影→MPMVA」。",touch="九項都打勾了。點「完成此步驟」進入檢影；教學模式會檢查有沒有漏做。之後想直接練主觀驗光，可以按任務卡上的「跳過檢影→MPMVA」。",done=()=>world.session.stage>=1});
+   s.Add(new GuideStep{title="轉動旋鈕",enter=()=>world.GuidePrepareStage(4),world=()=>TargetPos("sph:0"),desk="滑鼠指向發亮的球面大轉盤：滾輪轉動，或左鍵＋0.25、右鍵−0.25。現在把右眼球面轉一格。",touch="點發亮的球面大轉盤，下方會出現「−／＋」按鈕，點一下改 0.25 D。",done=()=>Mathf.Abs(world.session.eyes[0].lens.s-guideStartSph)>.1f||Mathf.Abs(world.session.H.lens.s-guideStartSph)>.1f});
    s.Add(new GuideStep{title="遮蓋另一眼",ui="occlude",world=()=>TargetPos("aux:1"),desk="點「另一眼 OC」（或按 O）：非測試眼的輔助鏡片在 OC（遮蓋）和 O（開放）之間切換。",touch="點「另一眼 OC」，或點左眼（畫面右邊）發亮的小輔助鏡片旋鈕：非測試眼在 OC（遮蓋）和 O（開放）之間切換。",done=()=>world.session.occluded!=guideStartOcc||Clicked("occlude")});
    s.Add(new GuideStep{title="遙控器換視標",ui="Projector remote",desk="左下的遙控器可以換 E 字／紅綠／點陣，也可以直接選視力列。點一個數字換列。",touch="左下的遙控器可以換 E 字／紅綠／點陣，也可以直接選視力列。點一個數字換列。",done=()=>ClickedPrefix("remote VA ")});
    s.Add(new GuideStep{title="詢問受測者",ui="read",desk="點「詢問／讀視標」（或空白鍵）：受測者會念出這一列看到的方向，右上角會顯示記法。",touch="點「詢問／讀視標」：受測者會念出這一列看到的方向。",done=()=>world.session.H.reads>guideStartReads||Clicked("read")});

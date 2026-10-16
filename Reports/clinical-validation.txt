@@ -13,6 +13,7 @@ PASS Over-minus gives green-clear response: add plus
 PASS Correct Rx has good acuity
 PASS Pinhole improves optical blur in this model
 PASS Balanced axis produces equal JCC responses
+PASS Skip retinoscopy lands on OD first MPMVA with both net refractions filled
 PASS Duochrome end point is the first green after red
 PASS Four-direction P search: red preferred only on the hidden minus-cylinder axis (180), white at 90, equal at 45/135
 PASS Random 19-21-year-old cases stay in range (0.25 D steps, minus cylinder, PD 59-68)
@@ -252,4 +253,4 @@ PASS Case 6 completes the midterm workflow
 PASS Case 6 full workflow scores 100
 PASS Exam allows progression and records unmet criteria without giving hints
 PASS An unattempted clinical case does not receive clinical points
-254 checks passed
+255 checks passed

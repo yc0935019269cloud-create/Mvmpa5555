@@ -232,7 +232,8 @@ namespace RefractionRoom {
    if(Input.GetKeyDown(KeyCode.Escape))TogglePause();
    if(!paused&&Input.GetKeyDown(KeyCode.Tab)){ToggleNotebook();}
    if(!paused&&Input.GetKeyDown(KeyCode.H)){ui.immersive=!ui.immersive;Toast(ui.immersive?"沉浸模式 · H 顯示教學與工具列，鍵盤和實體旋鈕仍可操作。":"已顯示教學與工具列。");}
-   if(Input.touchCount>0)touchMode=true;
+   if(Input.touchCount>0){touchMode=true;Input.simulateMouseWithTouches=false;}
+   TrackTouches();
    if(Input.GetMouseButtonDown(0)){mouseDowns++;var es=UnityEngine.EventSystems.EventSystem.current;uiHit="none";if(es){var pe=new UnityEngine.EventSystems.PointerEventData(es){position=Input.mousePosition};var hits=new List<UnityEngine.EventSystems.RaycastResult>();es.RaycastAll(pe,hits);uiHit=hits.Count>0?hits[0].gameObject.name+"/"+hits.Count:"no-hit";}else uiHit="no-eventsystem";}
    bool overUI=UnityEngine.EventSystems.EventSystem.current&&UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
    hover=null;hoverLabel="";
@@ -269,7 +270,7 @@ namespace RefractionRoom {
       }
      }
      if(!focused&&!patientView&&!tweening){
-      if(lookCaptured||Cursor.lockState==CursorLockMode.Locked||Input.GetMouseButton(1)){yaw+=Input.GetAxis("Mouse X")*2;pitch=Mathf.Clamp(pitch-Input.GetAxis("Mouse Y")*1.5f,-72,72);view.transform.rotation=Quaternion.Euler(pitch,yaw,0);}
+      if(!touchMode&&(lookCaptured||Cursor.lockState==CursorLockMode.Locked||Input.GetMouseButton(1))){yaw+=Input.GetAxis("Mouse X")*2;pitch=Mathf.Clamp(pitch-Input.GetAxis("Mouse Y")*1.5f,-72,72);view.transform.rotation=Quaternion.Euler(pitch,yaw,0);}
       if(!touchMode&&Input.GetMouseButtonDown(0)&&Cursor.lockState!=CursorLockMode.Locked&&!overUI)Lock();
       Vector2 sv=ui&&ui.stick&&ui.stick.isActiveAndEnabled?ui.stick.value:Vector2.zero;
       Vector3 delta=Vector3.ClampMagnitude(Quaternion.Euler(0,yaw,0)*new Vector3(Input.GetAxisRaw("Horizontal")+sv.x,0,Input.GetAxisRaw("Vertical")+sv.y),1);
@@ -425,6 +426,27 @@ namespace RefractionRoom {
 
   // ---------------- touch ----------------
   bool touchDragging;
+  // Multi-touch: the browser can hand Unity touches with swapped indices when two fingers move at once,
+  // so fingers are followed by position (nearest match), not by id. One finger may own the joystick,
+  // one may own the view; each delta comes from that finger's own previous position.
+  public bool touchOwnsInput;bool stickFinger,lookFinger,lookMoved;Vector2 stickPos,lookPos,lookStart;
+  static readonly List<UnityEngine.EventSystems.RaycastResult> touchHits=new List<UnityEngine.EventSystems.RaycastResult>();
+  string TopUI(Vector2 p){var es=UnityEngine.EventSystems.EventSystem.current;if(!es)return "";touchHits.Clear();es.RaycastAll(new UnityEngine.EventSystems.PointerEventData(es){position=p},touchHits);return touchHits.Count>0?touchHits[0].gameObject.name:"";}
+  void TrackTouches(){
+   touchOwnsInput=touchMode&&Input.touchCount>0;
+   var pts=new List<Vector2>();var began=new List<bool>();
+   for(int i=0;i<Input.touchCount;i++){var t=Input.GetTouch(i);if(t.phase==TouchPhase.Ended||t.phase==TouchPhase.Canceled)continue;pts.Add(t.position);began.Add(t.phase==TouchPhase.Began);}
+   int Take(Vector2 near){int best=-1;float bd=220;for(int i=0;i<pts.Count;i++){float d=Vector2.Distance(pts[i],near);if(d<bd){bd=d;best=i;}}return best;}
+   var st=ui?ui.stick:null;bool stickOn=st&&st.isActiveAndEnabled;
+   if(stickFinger){int k=Take(stickPos);if(k<0||!stickOn){stickFinger=false;if(st)st.SetValue(Vector2.zero);}else{stickPos=pts[k];pts.RemoveAt(k);began.RemoveAt(k);st.SetScreen(stickPos);}}
+   if(lookFinger){int k=Take(lookPos);if(k<0){lookFinger=false;TouchRelease();}else{Vector2 d=pts[k]-lookPos;lookPos=pts[k];pts.RemoveAt(k);began.RemoveAt(k);if(d.sqrMagnitude<140*140){if((lookPos-lookStart).sqrMagnitude>100)lookMoved=true;if(lookMoved)TouchDrag(Vector2.ClampMagnitude(d,60));}}}
+   for(int i=0;i<pts.Count;i++){
+    string top=TopUI(pts[i]);
+    if(!stickFinger&&stickOn&&(top=="Walk stick"||st.Contains(pts[i]))){stickFinger=true;stickPos=pts[i];st.SetScreen(stickPos);continue;}
+    if(!lookFinger&&began[i]&&(top=="Touch pad"||top=="")){lookFinger=true;lookPos=lookStart=pts[i];lookMoved=false;}
+   }
+  }
+  public bool TouchLookMoved{get{return lookMoved;}}
   public void TouchDrag(Vector2 d){
    if(cinematic||paused||notebook||pdStep>=0||tweening)return;touchDragging=true;
    if(!focused&&!patientView){yaw+=d.x*.16f;pitch=Mathf.Clamp(pitch-d.y*.12f,-72,72);view.transform.rotation=Quaternion.Euler(pitch,yaw,0);}
@@ -500,6 +522,8 @@ namespace RefractionRoom {
   public void SaveProgress(){if(ui&&ui.guideOn)return;if(begun){PlayerPrefs.SetInt("ClinicRemote",remoteOwned?1:0);PlayerPrefs.SetString("ClinicSession",JsonUtility.ToJson(session));PlayerPrefs.Save();if(ui)ui.canResume=true;}}
   // new-player walkthrough helpers
   public void GuideWalkTo(Vector3 p,Vector3 lookAt){if(focused){focused=false;targetFov=66;}Vector3 d=lookAt-p;yaw=Mathf.Atan2(d.x,d.z)*Mathf.Rad2Deg;pitch=-Mathf.Atan2(d.y,new Vector2(d.x,d.z).magnitude)*Mathf.Rad2Deg;walkPos=p;GoTo(p,Quaternion.Euler(pitch,yaw,0));}
+  public void SkipRetinoscopy(){if(busy||pdStep>=0||session.stage<1||session.stage>5)return;ReturnTools();held=0;targetFov=focused?FocusFov():66;session.SkipRetinoscopy();SyncMechanics(true);DrawChart();if(focused)GoTo(FocusPoint(),Quaternion.identity);
+   Toast("已跳過檢影：兩眼以參考度數當淨檢影值，直接開始右眼第一次 MPMVA（先霧視）。"+(session.mode=="考試"?"考試會記錄這次跳過。":""));SaveProgress();}
   public void GuideResetScene(){session=new ClinicSession();remoteOwned=false;held=0;SyncMechanics(true);DrawChart();}
   public void GuidePrepareStage(int st){for(int i=0;i<9;i++)session.prepared[i]=true;session.phoropterIn=true;session.stage=st;session.EnterStage();session.jccMode=0;session.occluded=true;remoteOwned=true;projectorOn=true;if(held==1){ReturnTools();held=0;}SyncMechanics(true);DrawChart();if(focused)GoTo(FocusPoint(),Quaternion.identity);}
   public void PointerState(string state){lookCaptured=state=="1";}

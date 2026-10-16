@@ -68,7 +68,7 @@ namespace RefractionRoom {
   public EyeHistory[] eyes={new EyeHistory(),new EyeHistory()};
   public float wdCm=57,pd=60,level=3,height=.1f,vertex=18,row=.6f,streak;
   public int chart=0,jccMode=0;
-  public bool ph,occluded,wdRemoved,completed;
+  public bool ph,occluded,wdRemoved,completed,skippedRet;
   public float seconds,pdMeasured,pdZeroError;
   public bool phoropterIn;
   public List<string> events=new List<string>();
@@ -170,11 +170,19 @@ namespace RefractionRoom {
   }
   public void RegisterJCC(){if(Searching&&jccMode==2)H.searchSeen|=1<<SearchBucket(H.searchAngle);if(jccMode==1)H.axisComparisons++;else H.powerComparisons++;if(Phase==3&&jccMode==JCCPattern[H.routeIndex])H.routeComparisons++;}
   public bool Advance(){var missing=Missing();if(mode=="教學"&&missing.Count>0)return false;if(mode=="考試"&&missing.Count>0)examErrors.Add(StageTitle+"："+string.Join("、",missing));if(Phase==3&&H.routeIndex<JCCPattern.Length-1){H.routeIndex++;H.routeComparisons=0;jccMode=JCCPattern[H.routeIndex];Log("JCC "+H.route+" 第 "+(H.routeIndex+1)+" 輪");return true;}if(stage<16){stage++;EnterStage();}else completed=true;Log("進入 "+Titles[stage]);return true;}
+  // Practice shortcut: skip retinoscopy + WD + VA and start the first MPMVA from the case's reference
+  // refraction (as if retinoscopy had been perfect). Retinoscopy points are not awarded.
+  public void SkipRetinoscopy(){
+   float wd=Optics.WD(wdCm);
+   for(int e=0;e<2;e++){var h=eyes[e];Rx t=Truth(e);h.gross=new Rx(t.s+wd,t.c,t.a);h.grossSaved=true;h.net=t;h.netSaved=true;h.lens=t;h.sweeps=2;h.vaText="略過";h.vaSaved=true;}
+   wdRemoved=true;skippedRet=true;occluded=true;phoropterIn=true;stage=6;EnterStage();
+   Log("跳過檢影，直接進入第一次 MPMVA");if(mode=="考試")examErrors.Add("跳過檢影（檢影、工作距離、檢影後 VA 不計分）");
+  }
   public int Score(){
    float score=0;foreach(bool b in prepared)if(b)score+=10f/9;
    for(int e=0;e<2;e++){var h=eyes[e];Rx tr=Truth(e);Rx gr=new Rx(tr.s+Optics.WD(wdCm),tr.c,tr.a);
-    if(h.grossSaved)score+=5*Mathf.Clamp01(1-(Optics.Power(h.gross)-Optics.Power(gr)).magnitude);if(h.netSaved&&wdRemoved)score+=2.5f;
-    if(h.vaSaved&&h.measuredVA>0&&(h.measuredVA>=.8f||h.phRead))score+=4;
+    if(h.grossSaved&&!skippedRet)score+=5*Mathf.Clamp01(1-(Optics.Power(h.gross)-Optics.Power(gr)).magnitude);if(h.netSaved&&wdRemoved&&!skippedRet)score+=2.5f;
+    if(!skippedRet&&h.vaSaved&&h.measuredVA>0&&(h.measuredVA>=.8f||h.phRead))score+=4;
     if(h.fogged&&h.mp1Saved)score+=5;if(h.duoAsked)score+=3;if(h.axisComparisons>=2&&h.powerComparisons>=2&&h.jccSaved)score+=8;
     if(h.finalSaved)score+=10*Mathf.Clamp01(1-(Optics.Power(h.final)-Optics.Power(tr)).magnitude);
     if(h.finalSaved&&h.finalKey==LensKey(e))score+=2.5f;

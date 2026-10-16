@@ -17,7 +17,7 @@ namespace RefractionRoom {
   RawImage chartRaw;Text chartTitle;
   GameObject remotePanel; Text remoteStatus;
   GameObject chartPanel,hud,station,book,pausedPanel,retPanel,pdPanel,tipBox,crossObj,touchPad,stickObj,walkButtons,knobBar,pdButtons,shadeL,shadeR;
-  public ClinicStick stick;CanvasScaler scaler;Text knobLabel,wdText,wdPrepText,wdHint,sweepText;Button wdChip;GameObject wdPicker;List<Button> wdOpts=new List<Button>();RectTransform sweepAxis,sweepDot;
+  public ClinicStick stick;CanvasScaler scaler;Text knobLabel,wdText,wdPrepText,wdHint,sweepText;Button skipRet;Button wdChip;GameObject wdPicker;List<Button> wdOpts=new List<Button>();RectTransform sweepAxis,sweepDot;
   Text task,step,patient,clock,mission,helper,context,toast,conversation,readout,retReadout,record,bookTitle,previewLabel,patientChoice,tip,pdText,pdReading;
   Button next,resume;Text volumeLabel;Slider musicSlider;GameObject abandonConfirm;
   List<Button> prepButtons=new List<Button>();
@@ -77,6 +77,7 @@ namespace RefractionRoom {
    task=Txt("task",objectives.transform,"",0,83,300,70,27,pale,new Vector2(.5f,.5f));
    mission=Txt("mission",objectives.transform,"",0,-32,300,150,18,pale,new Vector2(.5f,.5f),TextAnchor.UpperLeft);
    Btn("hint",objectives.transform,"提示 開／關",0,-137,300,34,()=>{if(world.session.mode=="考試"){world.Toast("考試模式不提供提示。");return;}hints=!hints;});
+   skipRet=Btn("skip ret",objectives.transform,"跳過檢影→MPMVA",78,-137,146,34,()=>world.SkipRetinoscopy());skipRet.GetComponentInChildren<Text>().fontSize=14;
    var helperCard=Panel("Reason card",hud.transform,-598,-59,340,160,new Vector2(.5f,.5f),dark);
    helper=Txt("helper",helperCard.transform,"",0,0,306,144,18,pale,new Vector2(.5f,.5f),TextAnchor.UpperLeft);
    var cross=Txt("crosshair",hud.transform,"+",0,0,30,30,24,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);crossObj=cross.gameObject;
@@ -230,7 +231,7 @@ namespace RefractionRoom {
    foreach(var b in root.GetComponentsInChildren<Button>(true)){var t=b.GetComponentInChildren<Text>(true);if(!t)continue;if(t.text=="Esc"){t.text="選單";continue;}t.text=key.Replace(t.text,"");}
    foreach(var t in root.GetComponentsInChildren<Text>(true)){if(t.name=="walk help")t.text="左下搖桿走路 · 拖曳畫面轉頭 · 點物件互動 · 右下按鈕坐近驗光儀";if(t.name=="menu help")t.text="平板：左下搖桿走路、拖曳轉頭、點物件互動；建議橫放並開全螢幕";if(t.name=="station help")t.text="直接點儀器上的旋鈕，下方出現 − ／ ＋ 調整（外側大轉盤＝球面、內鈕＝柱面、外圈＝軸位、上方小鈕＝輔助鏡片）";}
    portraitHint=Txt("portrait hint",root,"建議把平板橫放，按鈕會比較大、比較好點",0,360,900,40,22,accent,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);}
-  public void Refresh(){if(!world||!root)return;if(world.touchMode&&!touchLabels)ApplyTouchLabels();if(portraitHint)portraitHint.gameObject.SetActive(Screen.height>Screen.width);scaler.matchWidthOrHeight=Screen.height>0&&(float)Screen.width/Screen.height<1.7f?0:1;var s=world.session;bool play=world.begun;hud.SetActive(play);book.SetActive(play&&world.notebook);pausedPanel.SetActive(play&&world.paused);resume.interactable=canResume;
+  public void Refresh(){if(!world||!root)return;if(skipRet){bool sk=world.begun&&world.session.stage>=1&&world.session.stage<=5&&world.pdStep<0;skipRet.gameObject.SetActive(sk);var hr=(RectTransform)skipRet.transform.parent.Find("hint");if(hr){hr.anchoredPosition=new Vector2(sk?-78:0,-137);hr.sizeDelta=new Vector2(sk?146:300,34);var ht=hr.GetComponentInChildren<Text>();((RectTransform)ht.transform).sizeDelta=new Vector2((sk?146:300)-12,34);}}if(world.touchMode&&!touchLabels)ApplyTouchLabels();if(portraitHint)portraitHint.gameObject.SetActive(Screen.height>Screen.width);scaler.matchWidthOrHeight=Screen.height>0&&(float)Screen.width/Screen.height<1.7f?0:1;var s=world.session;bool play=world.begun;hud.SetActive(play);book.SetActive(play&&world.notebook);pausedPanel.SetActive(play&&world.paused);resume.interactable=canResume;
    if(!world.paused&&abandonConfirm)abandonConfirm.SetActive(false);if(volumeLabel)volumeLabel.text="背景音樂音量  "+Mathf.RoundToInt(world.musicVolume*100)+"%";
    if(!play)return;
    task.text=s.StageTitle;step.text="STEP "+(s.stage+1).ToString("00")+" / 17  ·  "+s.mode;
