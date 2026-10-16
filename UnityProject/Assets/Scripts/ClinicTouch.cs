@@ -18,6 +18,12 @@ namespace RefractionRoom {
   public void OnPointerClick(PointerEventData e){if(!dragged&&!world.TouchLookMoved)world.TouchTap(e.position);}
   void OnDisable(){if(knob){knob=false;world.KnobUp();}finger=int.MinValue;}
  }
+ // The retinoscope eyepiece panel (top right) sweeps the streak too: drag anywhere on it (finger or mouse).
+ public class ClinicSweepPad : MonoBehaviour, IDragHandler, IEndDragHandler {
+  public ClinicWorld world;
+  public void OnDrag(PointerEventData e){world.TouchDrag(Vector2.ClampMagnitude(e.delta,60));}
+  public void OnEndDrag(PointerEventData e){world.TouchRelease();}
+ }
  // Virtual joystick for walking.
  public class ClinicStick : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler {
   public RectTransform knob;public float radius=90;public Vector2 value;

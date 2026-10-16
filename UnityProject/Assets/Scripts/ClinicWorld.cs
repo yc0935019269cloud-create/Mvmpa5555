@@ -449,7 +449,8 @@ namespace RefractionRoom {
   }
   public bool TouchLookMoved{get{return lookMoved;}}
   public void TouchDrag(Vector2 d){
-   if(cinematic||paused||notebook||pdStep>=0||tweening)return;touchDragging=true;
+   if(pdStep>=0){if(!busy&&!cinematic&&!paused&&!notebook)PDDrag(d.x);return;}
+   if(cinematic||paused||notebook||tweening)return;touchDragging=true;
    if(!focused&&!patientView){yaw+=d.x*.16f;pitch=Mathf.Clamp(pitch-d.y*.12f,-72,72);view.transform.rotation=Quaternion.Euler(pitch,yaw,0);}
    else if(focused&&held==1){float ang=(session.streak+90)*Mathf.Deg2Rad;sweep=Mathf.Clamp(sweep+(d.x*Mathf.Cos(ang)+d.y*Mathf.Sin(ang))*.006f,-1,1);if(Mathf.Abs(sweep)>.8f)CountSweep();}
    else if(focused){lookYaw=Mathf.Clamp(lookYaw+d.x*.08f,-35,35);lookPitch=Mathf.Clamp(lookPitch-d.y*.06f,-25,20);}
@@ -853,6 +854,7 @@ namespace RefractionRoom {
    int s=Input.GetKeyDown(KeyCode.RightArrow)?1:Input.GetKeyDown(KeyCode.LeftArrow)?-1:0;float sc=Input.mouseScrollDelta.y;if(Mathf.Abs(sc)>.1f)s=sc>0?1:-1;
    if(s!=0)PDNudge(s);
    if(Input.GetKeyDown(KeyCode.Return)||Input.GetKeyDown(KeyCode.KeypadEnter))PDConfirm();
+   if(!touchMode)PDMouseDrag();
    if(Input.GetKeyDown(KeyCode.F))PDExit(false);
   }
   public void PDInstruct(){if(pdStep<0)return;pdInstructed=true;Say("（你）請看著我張開的這隻眼睛，不要動。　受測者：好。",false);if(pdStep==0)pdStep=1;Toast("先閉上你的右眼（Q），用左眼對準受測者的右眼。");}
@@ -864,9 +866,22 @@ namespace RefractionRoom {
     if(eye==2&&pdStep<3){Toast("先閉右眼（Q），把 0 對準受測者右眼瞳孔的右緣。");return;}
    }
    examinerEye=eye;GoTo(PDEye(eye),Quaternion.identity);audioOut.PlayOneShot(tick,.5f);
-   if(eye==1){if(pdStep<2)pdStep=2;Toast("你閉右眼、用左眼看；受測者看著你的左眼。← → 移動 PD 尺，讓 0 對準他右眼瞳孔的右緣（顳側），Enter 確認。");}
-   if(eye==2){if(pdStep==3)pdStep=4;Toast("你閉左眼、改用右眼看；受測者看著你的右眼。讀他左眼瞳孔靠右眼那一側（鼻側）的刻度，← → 選數值，Enter 記錄。");}
+   if(eye==1){if(pdStep<2)pdStep=2;Toast("你閉右眼、用左眼看；受測者看著你的左眼。按住畫面左右拖曳（或 ← →）移動 PD 尺，讓 0 對準他右眼瞳孔的右緣（顳側），Enter 確認。");}
+   if(eye==2){if(pdStep==3)pdStep=4;Toast("你閉左眼、改用右眼看；受測者看著你的右眼。讀他左眼瞳孔靠右眼那一側（鼻側）的刻度，左右拖曳（或 ← →）選數值，Enter 記錄。");}
    if(eye==0)Toast("雙眼都張開時受測者會看你兩眼之間，量測會有視差。");
+  }
+  // Hold and drag left / right: the ruler follows the finger 1:1 (zero alignment); on the reading step every 24 px moves the reading 0.5 mm.
+  float pdDragAcc,pdMouseX;bool pdMouseDown;
+  public void PDDrag(float dxPx){
+   if(pdStep<0||busy)return;
+   if(pdStep<=3){var r=N("PDRuler");if(!r)return;float dist=Mathf.Abs(r.position.z-view.transform.position.z);float perPx=2*dist*Mathf.Tan(view.fieldOfView*.5f*Mathf.Deg2Rad)/Mathf.Max(1,Screen.height);r.position+=new Vector3(dxPx*perPx,0,0);}
+   else if(pdStep==4){pdDragAcc+=dxPx;int n=(int)(pdDragAcc/24f);if(n!=0){pdDragAcc-=n*24f;pdReading=Mathf.Clamp(pdReading+n*.5f,45,80);audioOut.PlayOneShot(tick,.35f);}}
+  }
+  void PDMouseDrag(){
+   bool over=UnityEngine.EventSystems.EventSystem.current&&UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
+   if(Input.GetMouseButtonDown(0)){pdMouseDown=!over;pdMouseX=Input.mousePosition.x;}
+   if(!Input.GetMouseButton(0))pdMouseDown=false;
+   if(pdMouseDown){float x=Input.mousePosition.x;PDDrag(x-pdMouseX);pdMouseX=x;}
   }
   public void PDNudge(int s){if(pdStep<0)return;if(pdStep<=2||pdStep==3){var r=N("PDRuler");r.position+=new Vector3(s*.00025f,0,0);audioOut.PlayOneShot(tick,.35f);}else if(pdStep==4){pdReading=Mathf.Clamp(pdReading+s*.5f,45,80);audioOut.PlayOneShot(tick,.35f);}}
   float RulerCoord(Vector3 edge,Vector3 viewer){var r=N("PDRuler");var zero=N("RulerZero");float zr=r.position.z-.0008f;Vector3 p=viewer+(edge-viewer)*((zr-viewer.z)/(edge.z-viewer.z));return (p.x-zero.position.x)*1000;}

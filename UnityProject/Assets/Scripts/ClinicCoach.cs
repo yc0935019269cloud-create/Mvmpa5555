@@ -8,7 +8,7 @@ namespace RefractionRoom {
  // action is a drag. It is derived from the session state each time, so it follows whatever the student did.
  // The ring points at WHAT to operate, never at the answer; exam mode has none.
  public partial class ClinicUI {
-  class Coach {public string ui,wid,label;public int kind;}   // kind 0 tap/click, 1 drag round a dial, 2 drag a sweep
+  class Coach {public string ui,wid,label;public int kind;public bool tagOnly;}   // kind 0 tap/click, 1 drag round a dial, 2 drag a sweep
   Coach coachNow;float coachNext;
   GameObject coachFrame,coachArrow,coachDot,coachTag;Text coachText;
 
@@ -35,14 +35,15 @@ namespace RefractionRoom {
    // where is it on screen?
    Vector2? at=null;Vector2 size=new Vector2(90,90);var hr=(RectTransform)hud.transform;
    RectTransform rt=string.IsNullOrEmpty(c.ui)?null:FindUI(c.ui);
-   if(rt&&rt.gameObject.activeInHierarchy){Vector3[] k=new Vector3[4];rt.GetWorldCorners(k);Vector2 a,b;RectTransformUtility.ScreenPointToLocalPointInRectangle(hr,k[0],null,out a);RectTransformUtility.ScreenPointToLocalPointInRectangle(hr,k[2],null,out b);at=(a+b)/2;size=new Vector2(Mathf.Abs(b.x-a.x),Mathf.Abs(b.y-a.y))+new Vector2(22,22);}
+   if(c.tagOnly){}
+   else if(rt&&rt.gameObject.activeInHierarchy){Vector3[] k=new Vector3[4];rt.GetWorldCorners(k);Vector2 a,b;RectTransformUtility.ScreenPointToLocalPointInRectangle(hr,k[0],null,out a);RectTransformUtility.ScreenPointToLocalPointInRectangle(hr,k[2],null,out b);at=(a+b)/2;size=new Vector2(Mathf.Abs(b.x-a.x),Mathf.Abs(b.y-a.y))+new Vector2(22,22);}
    else if(!string.IsNullOrEmpty(c.wid)){Vector2 sp;float rpx;
     if(world.ControlScreen(c.wid,out sp,out rpx)&&sp.x>0&&sp.x<Screen.width&&sp.y>0&&sp.y<Screen.height){Vector2 l;RectTransformUtility.ScreenPointToLocalPointInRectangle(hr,sp,null,out l);at=l;float scale=hr.rect.width/Mathf.Max(1,Screen.width);float d=Mathf.Clamp(rpx*2*scale*1.6f,84,200);size=new Vector2(d,d);}}
    if(!at.HasValue){
     // target is off-screen: keep the instruction readable at the top
     coachFrame.SetActive(false);coachArrow.SetActive(false);coachDot.SetActive(false);
     coachText.text=c.label;var tr=(RectTransform)coachTag.transform;tr.sizeDelta=new Vector2(Mathf.Min(900,coachText.preferredWidth+36),44);((RectTransform)coachText.transform).sizeDelta=new Vector2(tr.sizeDelta.x-10,44);
-    tr.anchoredPosition=new Vector2(0,hr.rect.height/2-300);coachTag.SetActive(true);coachTag.transform.SetAsLastSibling();return;}
+    tr.anchoredPosition=new Vector2(0,hr.rect.height/2-(c.tagOnly?110:300));coachTag.SetActive(true);coachTag.transform.SetAsLastSibling();return;}
    var p=at.Value;var half=hr.rect.size/2;
    coachFrame.SetActive(true);coachArrow.SetActive(true);coachTag.SetActive(true);
    var fr=(RectTransform)coachFrame.transform;fr.anchoredPosition=p;fr.sizeDelta=size+new Vector2(14,14)*(1+.1f*Mathf.Sin(Time.unscaledTime*6));
@@ -72,9 +73,9 @@ namespace RefractionRoom {
     switch(world.pdStep){
      case 0:return C("pd say",null,"點這裡：請他看你的眼睛");
      case 1:return C("pd right",null,"點這裡：閉上你的右眼");
-     case 2:return C("PD buttons",null,"◀ ▶ 移 PD 尺，0 對準瞳孔邊緣再按確認");
+     case 2:return new Coach{label="按住畫面左右拖曳，移動 PD 尺讓 0 對準瞳孔邊緣，再按確認",tagOnly=true};
      case 3:return C("pd left",null,"點這裡：換閉左眼");
-     default:return C("PD buttons",null,"◀ ▶ 選讀數，再按確認");
+     default:return new Coach{label="左右拖曳選讀數（鼻側邊緣對到的刻度），再按確認",tagOnly=true};
     }
    }
    Coach focus=touch?C("t focus",null,"點這裡：坐近驗光儀"):C(null,"phoropter","走近受測者，按 F 坐近驗光儀");

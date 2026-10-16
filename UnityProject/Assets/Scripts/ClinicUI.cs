@@ -133,6 +133,7 @@ namespace RefractionRoom {
    chartTitle=Txt("chart title",chartPanel.transform,"6 m 視標",0,124,320,30,16,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
    var chartImg=new GameObject("Chart image",typeof(RectTransform),typeof(RawImage));Rect(chartImg,chartPanel.transform,0,-14,320,240,new Vector2(.5f,.5f));chartImg.GetComponent<RawImage>().texture=world.ChartTexture;chartImg.GetComponent<RawImage>().raycastTarget=false;chartRaw=chartImg.GetComponent<RawImage>();
    retPanel=Panel("Retinoscope view",hud.transform,600,136,332,472,new Vector2(.5f,.5f),dark);
+   retPanel.AddComponent<ClinicSweepPad>().world=world;
    Txt("ret title",retPanel.transform,"檢影鏡窺孔 · 放大觀察",0,211,306,40,18,pale,new Vector2(.5f,.5f));
    var raw=new GameObject("Pupil camera",typeof(RectTransform),typeof(RawImage));Rect(raw,retPanel.transform,0,45,290,290,new Vector2(.5f,.5f));raw.GetComponent<RawImage>().texture=scope;raw.GetComponent<RawImage>().raycastTarget=false;
    retReadout=Txt("reflex description",retPanel.transform,"",0,-129,306,55,18,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
@@ -266,7 +267,7 @@ namespace RefractionRoom {
    helper.transform.parent.gameObject.SetActive(showHints&&!immersive&&!world.cinematic&&!pd&&!world.remoteOwned);
    crossObj.SetActive(!world.focused&&!pd&&!world.cinematic);
    pdPanel.SetActive(pd&&!world.paused);
-   if(pd){string[] st={"① 空白鍵：「請看我的這隻眼睛。」","② Q：閉上你的右眼，用左眼看（受測者看你的左眼）","③ ← →：移動 PD 尺，0 對準他右眼瞳孔右緣（顳側），Enter","④ E：閉上你的左眼、張開右眼（受測者看你的右眼）","⑤ 讀他左眼瞳孔靠右眼側（鼻側）的刻度，← → 選數值，Enter"};
+   if(pd){string[] st={"① 空白鍵：「請看我的這隻眼睛。」","② Q：閉上你的右眼，用左眼看（受測者看你的左眼）","③ 按住畫面左右拖曳（或 ◀ ▶）移動 PD 尺，0 對準他右眼瞳孔右緣（顳側），按確認","④ E：閉上你的左眼、張開右眼（受測者看你的右眼）","⑤ 讀他左眼瞳孔靠右眼側（鼻側）的刻度，左右拖曳（或 ◀ ▶）選數值，按確認"};
     int cur=world.pdStep==0?0:world.pdStep==1?1:world.pdStep==2?2:world.pdStep==3?3:4;string t="";for(int i=0;i<st.Length;i++)t+=(i<cur?"<color=#8fb39a>✓ ":i==cur?"<color=#e8d29a>▶ ":"<color=#8a958f>   ")+st[i]+"</color>\n";
     pdText.text=t+"\n你的眼睛："+(world.examinerEye==1?"右眼閉 · 左眼看":world.examinerEye==2?"左眼閉 · 右眼看":"雙眼張開")+"　 Esc 取消";
     pdReading.text=world.pdStep==4?"讀數 "+world.pdReading.ToString("0.0")+" mm":world.pdStep>=2?"PD 尺移動 0.25 mm／格":"";}
