@@ -237,7 +237,8 @@ namespace RefractionRoom {
    if(Input.GetMouseButtonDown(0)){mouseDowns++;var es=UnityEngine.EventSystems.EventSystem.current;uiHit="none";if(es){var pe=new UnityEngine.EventSystems.PointerEventData(es){position=Input.mousePosition};var hits=new List<UnityEngine.EventSystems.RaycastResult>();es.RaycastAll(pe,hits);uiHit=hits.Count>0?hits[0].gameObject.name+"/"+hits.Count:"no-hit";}else uiHit="no-eventsystem";}
    bool overUI=UnityEngine.EventSystems.EventSystem.current&&UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
    hover=null;hoverLabel="";
-   if(touchMode&&touchSel!=""&&focused)hoverLabel=TouchSelLabel();
+   if(knobT&&knobPointer!=int.MinValue){hover=knobT;hoverLabel=knobT.label+"\n"+ControlState(knobT.id);}
+   else if(touchMode&&touchSel!=""&&focused){if(Time.time>touchSelUntil)touchSel="";else hoverLabel=TouchSelLabel();}
    if(!paused&&!notebook&&!cinematic){
     if(pdStep>=0)PDInput();
     else{
@@ -369,18 +370,18 @@ namespace RefractionRoom {
   string ControlState(string id){
    string[] p=id.Split(':');int e=p.Length>1?int.Parse(p[1]):session.eye;var L=session.eyes[e].lens;
    switch(p[0]){
-    case "sph":case "strong":return "球面 "+L.s.ToString("+0.00;-0.00;0.00")+" D · 滾輪/左右鍵調整";
-    case "cyl":return "柱面 "+L.c.ToString("0.00")+" DC · 左鍵 +、右鍵 −";
-    case "axis":return "軸位 "+Mathf.RoundToInt(L.a)+"° · 滾輪轉動";
+    case "sph":case "strong":return "球面 "+L.s.ToString("+0.00;-0.00;0.00")+" D · "+(touchMode?"沿圓周拖曳轉動":"滾輪/左右鍵調整");
+    case "cyl":return "柱面 "+L.c.ToString("0.00")+" DC · "+(touchMode?"沿圓周拖曳轉動":"左鍵 +、右鍵 −");
+    case "axis":return "軸位 "+Mathf.RoundToInt(L.a)+"° · "+(touchMode?"沿圓周拖曳轉動":"滾輪轉動");
     case "aux":int s=AuxState(e);return "目前 "+(s==1?"OC 遮蓋":s==2?"PH 針孔":"O 開放")+(e==session.eye?" · 點擊：O ↔ PH":" · 點擊：O ↔ OC");
     case "jcc":return session.jccMode==0?"拖曳支桿轉入；點擊選 A／P":session.jccMode==1?"軸位 A · 點擊轉 45° 到度數 P · 滾輪翻面 · 右鍵收回":"度數 P · 點擊轉回軸位 A · 滾輪翻面 · 右鍵收回";
     case "flip":return "滾輪／點擊翻面比較";
     case "jccarm":return "按住支桿拖曳：轉入窺孔／收回";
-    case "pd":return "PD "+session.pd.ToString("0.#")+" mm";
-    case "level":return "傾斜 "+session.level.ToString("0")+"°";
-    case "vertex":return "頂點距離 "+session.vertex.ToString("0")+" mm（目標 12）";
-    case "height":return "高度偏差 "+(session.height*100).ToString("0")+" cm";
-    case "lock":return session.prepared[7]?"已鎖定":"未鎖定";
+    case "pd":return "PD "+session.pd.ToString("0.#")+" mm"+(touchMode?" · 上下拖曳":"");
+    case "level":return "傾斜 "+session.level.ToString("0")+"°"+(touchMode?" · 上下拖曳":"");
+    case "vertex":return "頂點距離 "+session.vertex.ToString("0")+" mm（目標 12）"+(touchMode?" · 上下拖曳":"");
+    case "height":return "高度偏差 "+(session.height*100).ToString("0")+" cm"+(touchMode?" · 上下拖曳":"");
+    case "lock":return session.prepared[7]?"已鎖定":"未鎖定"+(touchMode?" · 點一下":"");
    }
    return "";
   }
@@ -443,7 +444,7 @@ namespace RefractionRoom {
    for(int i=0;i<pts.Count;i++){
     string top=TopUI(pts[i]);
     if(!stickFinger&&stickOn&&(top=="Walk stick"||st.Contains(pts[i]))){stickFinger=true;stickPos=pts[i];st.SetScreen(stickPos);continue;}
-    if(!lookFinger&&began[i]&&(top=="Touch pad"||top=="")){lookFinger=true;lookPos=lookStart=pts[i];lookMoved=false;}
+    if(!lookFinger&&began[i]&&(top=="Touch pad"||top=="")&&!(focused&&!patientView&&PickControl(pts[i],true)!=null)){lookFinger=true;lookPos=lookStart=pts[i];lookMoved=false;}
    }
   }
   public bool TouchLookMoved{get{return lookMoved;}}
@@ -458,7 +459,8 @@ namespace RefractionRoom {
    if(cinematic||paused||notebook||busy&&!focused)return;RaycastHit h;var ray=view.ScreenPointToRay(screen);
    if(pdStep>=0)return;
    if(focused&&!patientView){
-    if(Physics.Raycast(ray,out h,1.5f,1<<9)){var t=h.collider.GetComponent<ClinicTarget>();touchSel=t.id;touchSelName=t.label;string[] p=t.id.Split(':');
+    var t=PickControl(screen,false);
+    if(t){touchSel=t.id;touchSelName=t.label;touchSelUntil=Time.time+3;string[] p=t.id.Split(':');
      if(p[0]=="flip"||p[0]=="lock"||p[0]=="aux"||p[0]=="jcc"||p[0]=="jccarm"){UseControl(t.id,1,true);}else{var tr=t.highlight?t.highlight:t.transform;Reach(tr);audioOut.PlayOneShot(tick,.4f);}}
     else touchSel="";
     return;
@@ -466,6 +468,65 @@ namespace RefractionRoom {
    if(!patientView&&Physics.Raycast(ray,out h,3.2f,1<<8)){target=h.collider.GetComponent<ClinicTarget>();Interact();}
   }
   public void TouchStep(int sign){if(touchSel!="")UseControl(touchSel,sign,true);}
+  float touchSelUntil;
+  // ---- direct knob drag (touch): press a knob and drag, no need to tap it first ----
+  // Round dials follow the finger around their centre (one step per the dial's own degrees per step, so the
+  // dial on screen turns with the finger); the other knobs step with an up/down drag.
+  ClinicTarget[] ctrl;
+  ClinicTarget[] Controls(){if(ctrl==null||ctrl.Length==0||!ctrl[0]){var l=new List<ClinicTarget>();foreach(var t in FindObjectsByType<ClinicTarget>(FindObjectsSortMode.None))if(t.gameObject.layer==9)l.Add(t);ctrl=l.ToArray();}return ctrl;}
+  static bool Adjustable(string id){string k=id.Split(':')[0];return k=="sph"||k=="strong"||k=="cyl"||k=="axis"||k=="pd"||k=="level"||k=="vertex"||k=="height";}
+  // The control under a fingertip: the one hit by the ray, else the nearest one within a finger's width.
+  ClinicTarget PickControl(Vector2 screen,bool adjustableOnly){
+   RaycastHit h;
+   if(Physics.Raycast(view.ScreenPointToRay(screen),out h,1.5f,1<<9)){var t=h.collider.GetComponent<ClinicTarget>();if(t&&(!adjustableOnly||Adjustable(t.id)))return t;}
+   if(held==1)return null;   // zoomed on the eye: only exact hits so a sweeping finger does not grab a dial
+   float best=Mathf.Max(30,Screen.height*.045f);ClinicTarget pick=null;
+   foreach(var t in Controls()){if(!t||adjustableOnly&&!Adjustable(t.id))continue;Vector3 sp=view.WorldToScreenPoint(t.transform.position);if(sp.z<=0||sp.z>1.5f)continue;float d=Vector2.Distance(new Vector2(sp.x,sp.y),screen);if(d<best){best=d;pick=t;}}
+   return pick;
+  }
+  // Screen position and rough on-screen radius of any interaction target (used by the next-step coach).
+  Dictionary<string,ClinicTarget> byId;
+  ClinicTarget TargetById(string id){
+   if(byId==null)byId=new Dictionary<string,ClinicTarget>();
+   ClinicTarget t;if(byId.TryGetValue(id,out t)&&t)return t;
+   foreach(var c in FindObjectsByType<ClinicTarget>(FindObjectsSortMode.None))if(c.id==id){byId[id]=c;return c;}
+   return null;
+  }
+  public bool ControlScreen(string id,out Vector2 screen,out float radiusPx){
+   screen=Vector2.zero;radiusPx=0;var t=TargetById(id);if(!t)return false;
+   Vector3 sp=view.WorldToScreenPoint(t.transform.position);if(sp.z<=0)return false;
+   float r=.02f;var sc=t.GetComponent<SphereCollider>();if(sc)r=sc.radius*Mathf.Max(t.transform.lossyScale.x,.0001f);var bc=t.GetComponent<BoxCollider>();if(bc)r=Mathf.Max(bc.size.x,bc.size.y)*.5f;
+   Vector3 sp2=view.WorldToScreenPoint(t.transform.position+view.transform.right*r);screen=new Vector2(sp.x,sp.y);radiusPx=Mathf.Abs(sp2.x-sp.x);return true;
+  }
+  public int knobPointer=int.MinValue;ClinicTarget knobT;Transform knobDial;float knobDeg,knobAccum,knobPrevAng,knobWarn;Vector2 knobPrev;bool knobRot,knobAngOk;
+  public bool KnobDown(Vector2 pos,int pointer){
+   if(!touchMode||!focused||patientView||paused||notebook||cinematic||pdStep>=0||tweening)return false;
+   var t=PickControl(pos,true);if(!t)return false;
+   string[] p=t.id.Split(':');int e=p.Length>1?int.Parse(p[1]):session.eye;float side=e==0?1:-1;
+   knobT=t;knobPointer=pointer;knobAccum=0;knobPrev=pos;knobDial=null;knobRot=false;knobAngOk=false;
+   switch(p[0]){case "sph":knobDial=N("Sph_"+EN[e]);knobDeg=side*15;break;case "strong":knobDial=N("StrongSph_"+EN[e]);knobDeg=-side*30;break;case "cyl":knobDial=N("Cyl_"+EN[e]);knobDeg=15;break;case "axis":knobDial=N("AxisKnob_"+EN[e]);knobDeg=5;break;}
+   if(knobDial){knobDeg*=Vector3.Dot(knobDial.forward,view.transform.forward)>0?1:-1;   // model axes may face away from the viewer: make the dial turn with the finger
+    knobRot=true;Vector3 c=view.WorldToScreenPoint(knobDial.position);Vector2 d=pos-new Vector2(c.x,c.y);if(d.magnitude>=20){knobPrevAng=Mathf.Atan2(d.y,d.x)*Mathf.Rad2Deg;knobAngOk=true;}}
+   touchSel=t.id;touchSelName=t.label;touchSelUntil=Time.time+3;Reach(t.highlight?t.highlight:t.transform);audioOut.PlayOneShot(tick,.4f);
+   return true;
+  }
+  public void KnobMove(Vector2 pos){
+   if(knobPointer==int.MinValue||!knobT)return;
+   if(paused||notebook||!focused||patientView){KnobUp();return;}
+   if(!session.phoropterIn){if(Time.time>knobWarn){knobWarn=Time.time+2.5f;Toast("綜合驗光儀還在旁邊，先把它轉到受測者眼前（做「調整水平」等準備動作會自動轉過來）。");}knobPrev=pos;return;}
+   float steps;
+   if(knobRot){
+    Vector3 c=view.WorldToScreenPoint(knobDial.position);Vector2 d=pos-new Vector2(c.x,c.y);
+    if(d.magnitude>=20){float a=Mathf.Atan2(d.y,d.x)*Mathf.Rad2Deg;if(knobAngOk)knobAccum+=Mathf.DeltaAngle(knobPrevAng,a);knobPrevAng=a;knobAngOk=true;}
+    else{knobAngOk=false;knobAccum+=(pos.x-knobPrev.x)/16f*knobDeg;}   // finger on the very centre: a sideways drag still turns it
+    steps=knobAccum/knobDeg;
+   }else{knobAccum+=(pos.y-knobPrev.y)/26f;steps=knobAccum;}
+   knobPrev=pos;
+   int n=Mathf.Min(4,Mathf.Abs((int)steps));
+   for(int i=0;i<n;i++)UseControl(knobT.id,steps>0?1:-1,true);
+   if(n>0)knobAccum-=Mathf.Sign(steps)*n*(knobRot?knobDeg:1);
+  }
+  public void KnobUp(){knobPointer=int.MinValue;knobT=null;}
   string touchSelName="";
   string TouchSelLabel(){return touchSelName+"\n"+ControlState(touchSel);}
 
@@ -544,12 +605,14 @@ namespace RefractionRoom {
   }
   public void Focus(){
    if(busy||pdStep>=0)return;if(patientView){PatientPOV();return;}
-   if(!focused){if(Vector3.Distance(view.transform.position,new Vector3(0,1.445f,4.23f))>3.2f){Toast(touchMode?"先用搖桿走近受測者與驗光儀，再點「坐近驗光儀」。":"先走近受測者與驗光儀，再按 F 坐近。");return;}returnPos=walkPos;focused=true;Release();GoTo(FocusPoint(),Quaternion.identity);targetFov=FocusFov();Toast(session.phoropterIn?(touchMode?"坐近操作 · 點儀器上的旋鈕，下方出現 − ／ ＋；「回診間」離開。":"坐近操作 · 滑鼠指向旋鈕：滾輪轉動、左鍵＋右鍵−；F 回診間。"):"驗光儀還轉在一旁；做水平、桌高等準備時會自動轉到受測者眼前。");}
+   if(!focused){if(Vector3.Distance(view.transform.position,new Vector3(0,1.445f,4.23f))>3.2f){Toast(touchMode?"先用搖桿走近受測者與驗光儀，再點「坐近驗光儀」。":"先走近受測者與驗光儀，再按 F 坐近。");return;}returnPos=walkPos;focused=true;Release();GoTo(FocusPoint(),Quaternion.identity);targetFov=FocusFov();Toast(session.phoropterIn?(touchMode?"坐近操作 · 手指按住旋鈕沿圓周拖曳就能轉；「回診間」離開。":"坐近操作 · 滑鼠指向旋鈕：滾輪轉動、左鍵＋右鍵−；F 回診間。"):"驗光儀還轉在一旁；做水平、桌高等準備時會自動轉到受測者眼前。");}
    else{focused=false;GoTo(returnPos,Quaternion.Euler(pitch,yaw,0));targetFov=66;Lock();}
    DrawChart();
   }
-  float FocusFov(){return held==1?34:46;}
-  Vector3 FocusPoint(){return held==1?PupilWorld(session.eye)-new Vector3(0,0,session.wdCm/100):new Vector3(0,1.455f,3.93f);}
+  // Touch layout keeps the side columns free, so the whole refractor is framed (wider view, a little lower camera).
+  float FocusFov(){return held==1?34:touchMode?TouchFov:46;}
+  public const float TouchFov=60;
+  Vector3 FocusPoint(){return held==1?PupilWorld(session.eye)-new Vector3(0,0,session.wdCm/100):new Vector3(0,touchMode?1.435f:1.455f,3.93f);}
   public void GoTo(Vector3 p,Quaternion r){fromPos=view.transform.position;fromRot=view.transform.rotation;toPos=p;toRot=r;tweenTime=0;tweening=true;}
   public void PatientPOV(){if(busy||pdStep>=0)return;patientView=!patientView;Release();if(!patientView){targetFov=focused?FocusFov():66;GoTo(focused?FocusPoint():walkPos,Quaternion.Euler(focused?0:pitch,focused?0:yaw,0));}else Toast("受測者視野：畫面模糊為示意；C 回驗光師。");DrawChart();}
   public void Interact(){
@@ -619,11 +682,16 @@ namespace RefractionRoom {
   public void WorkingDistance(){ShiftWD(1);}
   public void SetWD(float cm){int k=System.Array.IndexOf(WDOptions,cm);if(k<0)return;int cur=0;float best=999;for(int i=0;i<WDOptions.Length;i++){float d=Mathf.Abs(WDOptions[i]-session.wdCm);if(d<best){best=d;cur=i;}}if(k!=cur)ShiftWD(k-cur);else Toast("工作距離 "+cm+" cm ＝ "+Optics.WD(cm).ToString("0.00")+" D");}
   public void RemoveWD(){if(busy)return;if(session.wdRemoved){Toast("已扣除工作距離，避免重複扣除。");return;}StartCoroutine(Action("knob:Sph_OD",()=>{float wd=Optics.WD(session.wdCm);foreach(var h in session.eyes){Rx r=h.lens;r.s-=wd;h.lens=r;}session.wdRemoved=true;session.Log("雙眼扣 WD "+wd);SyncMechanics();Toast("雙眼球面各扣 "+wd.ToString("0.00")+"D；柱面與軸不變。");}));}
+  // Snapshot of everything the patient's answer depends on: the coach asks again once it changes.
+  public string askedKey="";
+  public string CurKey(){var s=session;return s.stage+"|"+s.eye+"|"+s.LensKey(s.eye)+"|"+s.row+"|"+s.chart+"|"+s.ph+"|"+s.jccMode+"|"+s.H.searchAngle+"|"+s.occluded;}
+  public bool AskedCurrent(){return askedKey==CurKey();}
   public void Ask(){
    if(busy||!focused)return;
    if(!session.occluded&&session.stage>=4){Toast("先把非測試眼的輔助鏡片轉到 OC，受測者才會只用測試眼比較。");return;}
    if(session.stage==1||session.stage==2){Sweep();return;}
    if(!projectorOn){Toast("請先開啟投影視標。");return;}
+   askedKey=CurKey();
    if(session.chart==1){StartCoroutine(Action("ask",()=>{session.H.duoAsked=true;string d=Optics.Duo(session.Truth(session.eye),session.H.lens);Say(d,true);if(session.mode!="考試")Toast(d.StartsWith("紅")?"紅色清楚 → 加 −0.25（加負）":"綠色清楚 → 若剛才還是紅色，這就是第一次綠色：停在這裡記錄；一開始就綠 → 加 +0.25 再問");session.Log("紅綠問答");}));return;}
    if(session.jccMode>0){StartCoroutine(CompareJCC());return;}
    StartCoroutine(Action("ask",()=>{session.Read();int n=session.H.lastLetters;int ri=Optics.RowIndex(session.row);string[] word={"右","上","左","下"};string s="";for(int i=0;i<5;i++)s+=(i<n?word[Optics.RowRot(ri,i)]:"看不清楚")+(i<4?"、":"。");Say("這一排："+s+(n<5?"後面有點糊。":""),true);

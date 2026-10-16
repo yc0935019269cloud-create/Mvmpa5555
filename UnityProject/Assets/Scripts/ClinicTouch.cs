@@ -3,16 +3,20 @@ using UnityEngine.EventSystems;
 
 namespace RefractionRoom {
  // Full-screen pad behind the HUD for touch (and mouse in touch mode): drag to look / sweep, tap to use what is under the finger.
+ // A finger that lands on an adjustable knob turns the knob instead (no tap-first step).
  public class ClinicTouchPad : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler, IPointerClickHandler {
   public ClinicWorld world;
-  bool dragged;int finger=int.MinValue;Vector2 last;
+  bool dragged,knob;int finger=int.MinValue;Vector2 last,start;
   // Only the finger that started on the pad turns the view. Deltas are computed from that finger's own
   // last position (the browser can mix up touch indices when a second finger is on the joystick), and
   // a single event may not move more than 60 px, so a swapped finger can never make the view jump.
-  public void OnPointerDown(PointerEventData e){if(finger!=int.MinValue&&finger!=e.pointerId)return;finger=e.pointerId;last=e.position;dragged=false;}
-  public void OnDrag(PointerEventData e){if(e.pointerId!=finger)return;if(world.touchOwnsInput){if((e.position-last).sqrMagnitude>100)dragged=true;return;}Vector2 d=e.position-last;last=e.position;if(d.sqrMagnitude>140*140)return;d=Vector2.ClampMagnitude(d,60);if(d.sqrMagnitude>4)dragged=true;world.TouchDrag(d);}
-  public void OnPointerUp(PointerEventData e){if(e.pointerId!=finger)return;finger=int.MinValue;if(!world.touchOwnsInput)world.TouchRelease();}
+  public void OnPointerDown(PointerEventData e){if(finger!=int.MinValue&&finger!=e.pointerId)return;finger=e.pointerId;last=start=e.position;dragged=false;knob=world.KnobDown(e.position,e.pointerId);}
+  public void OnDrag(PointerEventData e){if(e.pointerId!=finger)return;
+   if(knob){if((e.position-start).sqrMagnitude>100)dragged=true;world.KnobMove(e.position);return;}
+   if(world.touchOwnsInput){if((e.position-last).sqrMagnitude>100)dragged=true;return;}Vector2 d=e.position-last;last=e.position;if(d.sqrMagnitude>140*140)return;d=Vector2.ClampMagnitude(d,60);if(d.sqrMagnitude>4)dragged=true;world.TouchDrag(d);}
+  public void OnPointerUp(PointerEventData e){if(e.pointerId!=finger)return;finger=int.MinValue;if(knob){knob=false;world.KnobUp();return;}if(!world.touchOwnsInput)world.TouchRelease();}
   public void OnPointerClick(PointerEventData e){if(!dragged&&!world.TouchLookMoved)world.TouchTap(e.position);}
+  void OnDisable(){if(knob){knob=false;world.KnobUp();}finger=int.MinValue;}
  }
  // Virtual joystick for walking.
  public class ClinicStick : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler {

@@ -48,8 +48,8 @@ namespace RefractionRoom {
    patientChoice=Txt("case",card.transform,"病例 01  /  林同學",0,-83,330,45,22,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
    Btn("previous case",card.transform,"−",-226,-83,52,44,()=>{selectedPatient=selectedPatient==0?6:selectedPatient-1;CaseLabel();});
    Btn("next case",card.transform,"+",226,-83,52,44,()=>{selectedPatient=selectedPatient==6?0:selectedPatient+1;CaseLabel();});
-   Btn("tutorial",card.transform,"進入診間  /  教學",0,-152,550,58,()=>world.Begin("教學"),true);
-   Btn("free",card.transform,"自由練習",-142,-218,266,50,()=>world.Begin("自由"));
+   Btn("tutorial",card.transform,"進入診間  /  教學",0,-152,550,58,()=>{hints=true;world.Begin("教學");},true);
+   Btn("free",card.transform,"自由練習",-142,-218,266,50,()=>{hints=true;world.Begin("自由");});
    Btn("exam",card.transform,"期中考試 · 18 分鐘",142,-218,266,50,()=>{hints=false;world.Begin("考試");});
    Btn("guide start",card.transform,"新手操作教學",-142,-277,266,45,()=>StartGuide(),true);
    resume=Btn("resume",card.transform,"繼續上次練習",142,-277,266,45,()=>world.Resume());
@@ -81,7 +81,7 @@ namespace RefractionRoom {
    var helperCard=Panel("Reason card",hud.transform,-598,-59,340,160,new Vector2(.5f,.5f),dark);
    helper=Txt("helper",helperCard.transform,"",0,0,306,144,18,pale,new Vector2(.5f,.5f),TextAnchor.UpperLeft);
    var cross=Txt("crosshair",hud.transform,"+",0,0,30,30,24,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);crossObj=cross.gameObject;
-   context=Txt("context",hud.transform,"",0,-230,780,60,23,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
+   context=Txt("context",hud.transform,"",0,-230,780,60,23,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);var ctxShadow=context.gameObject.AddComponent<Shadow>();ctxShadow.effectColor=new Color(0,0,0,.9f);ctxShadow.effectDistance=new Vector2(2,-2);
    toast=Txt("toast",hud.transform,"",0,334,800,68,21,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
    var bubble=Panel("Patient subtitle",hud.transform,100,-110,740,76,new Vector2(.5f,.5f),new Color(.94f,.94f,.87f,.95f));
    bubble.GetComponent<Image>().raycastTarget=false;
@@ -163,11 +163,9 @@ namespace RefractionRoom {
    Btn("t focus",walkButtons.transform,"坐近驗光儀",600,-290,210,64,()=>world.Focus());
    Btn("t pov",walkButtons.transform,"受測者視野",600,-365,210,56,()=>world.PatientPOV());
    Btn("t look",walkButtons.transform,"工具列 開／關",380,-365,210,56,()=>{immersive=!immersive;});
-   knobBar=Panel("Knob bar",hud.transform,160,-118,700,74,new Vector2(.5f,.5f),dark);
-   Btn("knob minus",knobBar.transform,"−",-300,0,90,62,()=>world.TouchStep(-1));
-   Btn("knob plus",knobBar.transform,"+",205,0,90,62,()=>world.TouchStep(1),true);
-   Btn("knob close",knobBar.transform,"關",305,0,62,62,()=>world.touchSel="");
-   knobLabel=Txt("knob label",knobBar.transform,"",-45,0,400,70,16,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
+   // name of the knob under the finger (set with the knob's value while dragging); no buttons - drag the knob itself
+   knobBar=Panel("Knob bar",hud.transform,0,-118,560,64,new Vector2(.5f,.5f),dark);knobBar.GetComponent<Image>().raycastTarget=false;
+   knobLabel=Txt("knob label",knobBar.transform,"",0,0,530,60,18,pale,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);
    // closed-eye cue while measuring PD: the side of the examiner's closed eye is dimmed
    shadeL=Panel("Closed left eye",hud.transform,-660,0,340,3000,new Vector2(.5f,.5f),new Color(0,0,0,.55f));shadeL.GetComponent<Image>().raycastTarget=false;
    shadeR=Panel("Closed right eye",hud.transform,660,0,340,3000,new Vector2(.5f,.5f),new Color(0,0,0,.55f));shadeR.GetComponent<Image>().raycastTarget=false;
@@ -213,10 +211,11 @@ namespace RefractionRoom {
     if(child.gameObject==walkButtons){c.anchorMin=c.anchorMax=new Vector2(.5f,0);c.anchoredPosition=new Vector2(0,450);continue;}
     if(y>150){c.anchorMin=c.anchorMax=new Vector2(.5f,1);c.anchoredPosition=new Vector2(c.anchoredPosition.x,y-450);}
     else if(y<-100){c.anchorMin=c.anchorMax=new Vector2(.5f,0);c.anchoredPosition=new Vector2(c.anchoredPosition.x,y+450);}}
+   SnapStation();BuildCoach();
    Refresh();
   }
   void Update(){
-   GuideUpdate();
+   GuideUpdate();CoachUpdate();
    if(!world||!retPanel||!retPanel.activeSelf||sweepAxis==null)return;var s=world.session;
    float ang=s.streak+90;sweepAxis.localRotation=Quaternion.Euler(0,0,ang);
    Vector2 d=new Vector2(Mathf.Cos(ang*Mathf.Deg2Rad),Mathf.Sin(ang*Mathf.Deg2Rad));sweepDot.anchoredPosition=new Vector2(0,45)+d*world.sweep*120;
@@ -229,7 +228,7 @@ namespace RefractionRoom {
   bool touchLabels;Text portraitHint;
   void ApplyTouchLabels(){touchLabels=true;var key=new System.Text.RegularExpressions.Regex(@"\s+(空白鍵|Enter|Tab|[A-Z])$");
    foreach(var b in root.GetComponentsInChildren<Button>(true)){var t=b.GetComponentInChildren<Text>(true);if(!t)continue;if(t.text=="Esc"){t.text="選單";continue;}t.text=key.Replace(t.text,"");}
-   foreach(var t in root.GetComponentsInChildren<Text>(true)){if(t.name=="walk help")t.text="左下搖桿走路 · 拖曳畫面轉頭 · 點物件互動 · 右下按鈕坐近驗光儀";if(t.name=="menu help")t.text="平板：左下搖桿走路、拖曳轉頭、點物件互動；建議橫放並開全螢幕";if(t.name=="station help")t.text="直接點儀器上的旋鈕，下方出現 − ／ ＋ 調整（外側大轉盤＝球面、內鈕＝柱面、外圈＝軸位、上方小鈕＝輔助鏡片）";}
+   foreach(var t in root.GetComponentsInChildren<Text>(true)){if(t.name=="walk help")t.text="左下搖桿走路 · 拖曳畫面轉頭 · 點物件互動 · 右下按鈕坐近驗光儀";if(t.name=="menu help")t.text="平板：左下搖桿走路、拖曳轉頭、點物件互動；建議橫放並開全螢幕";if(t.name=="station help")t.text="手指按住儀器上的旋鈕，沿圓周拖曳就能轉（外側大轉盤＝球面、內鈕＝柱面、外圈＝軸位、上方小鈕＝輔助鏡片）";}
    portraitHint=Txt("portrait hint",root,"建議把平板橫放，按鈕會比較大、比較好點",0,360,900,40,22,accent,new Vector2(.5f,.5f),TextAnchor.MiddleCenter);}
   public void Refresh(){if(!world||!root)return;if(skipRet){bool sk=world.begun&&world.session.stage>=1&&world.session.stage<=5&&world.pdStep<0;skipRet.gameObject.SetActive(sk);var hr=(RectTransform)skipRet.transform.parent.Find("hint");if(hr){hr.anchoredPosition=new Vector2(sk?-78:0,-137);hr.sizeDelta=new Vector2(sk?146:300,34);var ht=hr.GetComponentInChildren<Text>();((RectTransform)ht.transform).sizeDelta=new Vector2((sk?146:300)-12,34);}}if(world.touchMode&&!touchLabels)ApplyTouchLabels();if(portraitHint)portraitHint.gameObject.SetActive(Screen.height>Screen.width);scaler.matchWidthOrHeight=Screen.height>0&&(float)Screen.width/Screen.height<1.7f?0:1;var s=world.session;bool play=world.begun;hud.SetActive(play);book.SetActive(play&&world.notebook);pausedPanel.SetActive(play&&world.paused);resume.interactable=canResume;
    if(!world.paused&&abandonConfirm)abandonConfirm.SetActive(false);if(volumeLabel)volumeLabel.text="背景音樂音量  "+Mathf.RoundToInt(world.musicVolume*100)+"%";
@@ -248,13 +247,15 @@ namespace RefractionRoom {
    bool pd=world.pdStep>=0;
    bool touchUI=world.touchMode&&!world.notebook&&!world.paused&&!world.cinematic;
    touchPad.SetActive(touchUI);stickObj.SetActive(touchUI&&!world.focused&&!pd&&!world.patientView);walkButtons.SetActive(touchUI&&!world.focused&&!pd);
-   knobBar.SetActive(touchUI&&world.focused&&!pd&&world.touchSel!="");if(knobBar.activeSelf)knobLabel.text=world.hoverLabel;
+   knobBar.SetActive(touchUI&&world.focused&&!pd&&world.hoverLabel!="");if(knobBar.activeSelf)knobLabel.text=world.hoverLabel;
    pdButtons.SetActive(pd&&!world.paused);
    shadeR.SetActive(pd&&world.examinerEye==1);shadeL.SetActive(pd&&world.examinerEye==2);
-   ((RectTransform)conversation.transform.parent).anchoredPosition=new Vector2(pd?0:100,pd?-345:-210);
+   bool dock=touchUI&&world.focused&&!pd&&!world.patientView;   // tablet: instrument controls dock in a side column, keep the refractor clear
+   ((RectTransform)conversation.transform.parent).anchoredPosition=dock?new Vector2(0,-392):new Vector2(pd?0:100,pd?-345:-210);
    station.SetActive(world.focused&&!pd&&!world.cinematic&&!world.patientView&&!world.notebook&&!world.paused&&!immersive);
    remotePanel.SetActive(world.remoteOwned&&!pd&&!world.cinematic&&!world.notebook&&!world.paused&&!world.patientView&&(!world.touchMode||world.focused));
    remoteStatus.text=world.projectorOn?(new[]{"E 字","紅綠","點陣"}[s.chart]+"  VA "+s.row.ToString("0.0")):"投影已關閉";
+   if(dockOn&&!(dock&&station.activeSelf)){RestoreStation();dockOn=false;}
    bool compact=world.held!=1&&s.stage!=1&&s.stage!=2&&s.stage!=3;
    foreach(Transform t in station.transform){string n=t.name;bool keep=n=="lens readout"||n=="read"||n=="record"||n=="next"||n=="leave"||n=="eye"||n=="fog"||n=="hold ret"||n=="station help";t.gameObject.SetActive(!compact||keep);}
    station.GetComponent<RectTransform>().anchoredPosition=new Vector2(160,compact?102:170);
@@ -271,8 +272,11 @@ namespace RefractionRoom {
     pdReading.text=world.pdStep==4?"讀數 "+world.pdReading.ToString("0.0")+" mm":world.pdStep>=2?"PD 尺移動 0.25 mm／格":"";}
    bool showTip=!world.touchMode&&world.focused&&!pd&&world.hoverLabel!=""&&!world.notebook&&!world.paused;tipBox.SetActive(showTip);
    if(showTip){tip.text=world.hoverLabel;Vector2 lp;RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform)hud.transform,Input.mousePosition,null,out lp);((RectTransform)tipBox.transform).anchoredPosition=lp+new Vector2(185,-40);}
+   if(dock&&!immersive)context.text=world.held==1?"":"手指按住旋鈕，沿圓周拖曳就能轉；金色框是下一步";
    if(immersive&&world.focused&&!world.patientView)context.text=s.EyeName+" "+s.H.lens+"  ·  滾輪調鏡 / V 切換參數 / H 工具列";
    readout.text=s.EyeName+"  "+s.H.lens+"    PD "+s.pd+" mm   VA 列 "+s.row.ToString("0.0")+"    "+new[]{"◀ 球面","◀ 柱面","◀ 軸位"}[world.parameter];
+   StationDock(dock&&station.activeSelf);
+   var wh=hud.transform.Find("walk help");if(wh)wh.gameObject.SetActive(!(world.touchMode&&world.focused));
    var prep=prepButtons[0].transform.parent.gameObject;prep.SetActive(s.stage==0&&!pd&&!world.cinematic&&!world.notebook&&!world.paused&&!immersive);
    for(int i=0;i<9;i++)prepButtons[i].GetComponentInChildren<Text>().text=(s.prepared[i]?"✓  ":"")+ClinicSession.PrepNames[i];
    retPanel.SetActive(world.focused&&world.held==1&&!world.patientView&&!world.notebook&&!world.paused);
