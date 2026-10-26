@@ -1,5 +1,6 @@
 (()=>{'use strict';const {Practice,stages,randomCase}=RefractionPractice,O=ClinicLegacy,$=id=>document.getElementById(id),eyes=['OD','OS'];
 const storageKey='clinic.2d-refraction.v1';let game,face,ret,zoomFace,unsubscribe,lastStage=-1,chart='E',scanTimer,saveTimer,jccBusy=false;
+const instrumentTranscript=$('jcc-sequence');
 function resumeAvailable(){try{return !!localStorage.getItem(storageKey);}catch{return false;}}
 $('resume').hidden=!resumeAvailable();
 function store(){if(!game)return;try{localStorage.setItem(storageKey,JSON.stringify(game.serialize()));}catch{}}
@@ -10,7 +11,7 @@ $('case-form').onsubmit=e=>{e.preventDefault();try{mount(new Practice(readCase()
 $('resume').onclick=()=>{try{mount(Practice.restore(JSON.parse(localStorage.getItem(storageKey))));}catch(err){$('setup-error').textContent='無法恢復：'+err.message;}};
 $('new-case').onclick=()=>{store();unsubscribe?.();ret?.stop();face?.destroy();$('practice').hidden=true;$('setup').hidden=false;$('new-case').hidden=true;$('resume').hidden=!resumeAvailable();};
 function mount(g){unsubscribe?.();face?.destroy();ret?.stop();game=g;window.refractionGame=g;lastStage=-1;$('setup').hidden=true;$('practice').hidden=false;$('new-case').hidden=false;
- face=new O.PhoropterFace(g);attachJccDrag(face);$('instrument-host').replaceChildren(face.el);ret=new O.RetinoView($('retino-canvas'),g);ret.auto=false;ret.hintOn=$('show-reflex-hint').checked;ret.eye=g.activeEye;ret.angle=+$('streak-angle').value;face.attachRetino(ret);ret.start();$('streak-angle').dispatchEvent(new Event('input'));unsubscribe=g.on(update);renderHardware();renderLensControls();update();window.dispatchEvent(new CustomEvent('clinic2d:mount'));}
+ face=new O.PhoropterFace(g);attachJccDrag(face);instrumentTranscript.textContent='';$('instrument-host').replaceChildren(face.el,instrumentTranscript);ret=new O.RetinoView($('retino-canvas'),g);ret.auto=false;ret.hintOn=$('show-reflex-hint').checked;ret.eye=g.activeEye;ret.angle=+$('streak-angle').value;face.attachRetino(ret);ret.start();$('streak-angle').dispatchEvent(new Event('input'));unsubscribe=g.on(update);renderHardware();renderLensControls();update();window.dispatchEvent(new CustomEvent('clinic2d:mount'));}
 const guide={ret:'旋轉光條找主子午線，來回掃描；調球面、柱面與軸，記錄兩眼 Gross 檢影。先不扣工作距離。',wd:'核對本輪工作距離，只從兩眼球面扣除工作距離度數；保留柱面與軸。',va:'這一頁直接提供雙眼淨檢影 VA。低於 0.8 時亦列出預測針孔 VA。',mp1:'加 +0.75D 霧視，再以 0.25D 逐格減正，每次核對 VA，找出維持最佳視力的最大正度數。',duo:'紅清加負、綠清加正，以 0.25D 微調；連續兩次加負都回綠時，自行退回一格負鏡後記錄。',jcc:'依患者對兩片的文字回答調整軸與柱面。A 比較軸；P 比較度數；選定後複核並收回 JCC，再記錄。',mp2:'JCC 後先加 +0.50D 再霧視，逐格減正並核對直接給出的 VA，記錄最終最大正度數。',done:'比較雙眼最後結果與設定終點，回看淨檢影、第一次 MPMVA、紅綠與 JCC 的調整。'};
 function renderPhase(){const d=game.def,p=d.phase;chart=p==='duo'?'duo':p==='jcc'?'dots':'E';$('phase-tools').innerHTML='';$('guidance').textContent=guide[p];let html='';
  if(p==='ret')html='<small>先掃一條主子午線，再把光條轉 90° 比較另一條；也可左右拖曳套筒轉輪細調角度。</small>';

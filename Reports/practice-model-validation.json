@@ -1,6 +1,6 @@
 {
-  "date": "2026-10-26T15:02:41.521Z",
-  "checks": 604,
+  "date": "2026-10-26T15:16:33.265Z",
+  "checks": 614,
   "status": "passed",
   "scenarios": {
     "chartPlates": 30,
@@ -611,6 +611,16 @@
     "PASS both eyes can receive assisted second MPMVA",
     "PASS second MPMVA does not automatically enter red-green",
     "PASS printed cylinder axis scale stays fixed when axis changes",
-    "PASS moving red axis indicator is rendered separately"
+    "PASS moving red axis indicator is rendered separately",
+    "PASS continuous OD positive rotations cross every zero boundary",
+    "PASS continuous OD negative rotations cross every zero boundary",
+    "PASS clinical OD axis remains canonical after multiple full rotations",
+    "PASS two opposing red pointers for OD",
+    "PASS continuous OS positive rotations cross every zero boundary",
+    "PASS continuous OS negative rotations cross every zero boundary",
+    "PASS clinical OS axis remains canonical after multiple full rotations",
+    "PASS two opposing red pointers for OS",
+    "PASS continuous mechanical turn survives save and restore",
+    "PASS older sessions without mechanical angle still restore"
   ]
 }

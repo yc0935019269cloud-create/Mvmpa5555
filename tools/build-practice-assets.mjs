@@ -15,6 +15,7 @@ code+='const face='+unit('ui/phoropterFace.js','const {h}=dom;const {faceSVG,AUX
 code+='const retview='+unit('ui/retinoCanvas.js','const {reflex}=retino;const {rad}=optics;','RetinoView',s=>s.replaceAll('g.lens(', 'g.retLens(').replace('streak: eye === this.eye','streak: eye === this.eye && this.game.def.phase === "ret"'))+';\n';
 code+='return {...optics,...retino,...dom,...svg,...face,...retview};})();\n';
 code=code.replace('(P.pd - 62) * 1.6','(P.pd - 63) * 2').replace('(192 + pdOff), ay = 288, r = 73','(200 + pdOff), ay = 330, r = 67').replaceAll('/ 680','/ 760').replace('aux: { stepDeg: 42','aux: { stepDeg: 72').replace("P[eye].aux !== 'O' || !P.aperture", "P[eye].aux !== 'O' || (eye === this.game.activeEye && P.jcc.mode !== 'off') || !P.aperture");
+code=code.replace('axisring: { stepDeg: 10','axisring: { stepDeg: 5');
 code=code.replace(/jcc: \(g, e\) => \{[\s\S]*?\n  \},/, `jcc: (g, e) => { if(g.activeEye!==e)g.setActiveEye(e);g.selectJccMode(g.phoro.jcc.selectedMode==='P'?'A':'P'); },`);
 fs.writeFileSync(path.join(dest,'legacy-instruments.js'),code);
 console.log('Bundled existing optics, SVG instrument, knob controls and retinoscopy canvas.');

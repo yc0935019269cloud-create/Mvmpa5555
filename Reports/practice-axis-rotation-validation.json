@@ -1,0 +1,40 @@
+{
+  "status": "passed",
+  "evidence": [
+    {
+      "eye": "OD",
+      "direction": 1,
+      "physicalDragDegrees": 720,
+      "mechanicalBefore": 180,
+      "mechanicalAfter": 895,
+      "largestStep": 15
+    },
+    {
+      "eye": "OD",
+      "direction": -1,
+      "physicalDragDegrees": 720,
+      "mechanicalBefore": 895,
+      "mechanicalAfter": 180,
+      "largestStep": 15
+    },
+    {
+      "eye": "OS",
+      "direction": 1,
+      "physicalDragDegrees": 720,
+      "mechanicalBefore": 180,
+      "mechanicalAfter": 895,
+      "largestStep": 15
+    },
+    {
+      "eye": "OS",
+      "direction": -1,
+      "physicalDragDegrees": 720,
+      "mechanicalBefore": 895,
+      "mechanicalAfter": 180,
+      "largestStep": 15
+    }
+  ],
+  "symmetric": true,
+  "restored": true,
+  "consoleErrors": 0
+}

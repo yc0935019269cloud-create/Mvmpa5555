@@ -36,7 +36,8 @@ class Practice {
  setVertex(v){this.phoro.vertex=clamp(Math.round(v),8,24);this.emit();}
  stepSph(e,d){this.phoro[e].s=clamp(q(this.phoro[e].s+d),-20,20);this.afterLens(e);}
  stepCyl(e,d){const l=this.phoro[e],prev=l.c;l.c=clamp(q(l.c+d),-6,0);if(this.autoComp&&(this.def.phase==='jcc'||this.phoro.jcc.mode!=='off')){this.compAcc[e]-=(l.c-prev)/2;while(this.compAcc[e]>=.25-1e-8){l.s=clamp(l.s+.25,-20,20);this.compAcc[e]-=.25;}while(this.compAcc[e]<=-.25+1e-8){l.s=clamp(l.s-.25,-20,20);this.compAcc[e]+=.25;}}this.afterLens(e);}
- stepAxis(e,d){this.phoro[e].a=axis(this.phoro[e].a+d);delete this.hist[e].searchAxis;this.afterLens(e);}
+ axisDialAngle(e=this.activeEye){const l=this.phoro[e],t=Number.isFinite(l.axisRotation)?l.axisRotation:l.a;return t+((axis(l.a)-axis(t)+90)%180+180)%180-90;}
+ stepAxis(e,d){const l=this.phoro[e];l.axisRotation=this.axisDialAngle(e)+d;l.a=axis(l.axisRotation);delete this.hist[e].searchAxis;this.afterLens(e);}
  afterLens(e){const p=this.def.phase,h=this.hist[e];if(['mp1','mp2'].includes(p)&&this.def.eye===e){const d=O.toVec(this.lens(e)).M-h.entry[p];h.fogMax[p]=Math.max(h.fogMax[p],d);if(d>=(p==='mp1'?.75:.5)-.01)h.fogged[p]=true;}this.emit();}
  setJccMode(mode){if(!['off','A','P'].includes(mode))return;this.phoro.jcc={mode,pos:1,selectedMode:mode==='off'?(this.phoro.jcc.selectedMode||'A'):mode};this.emit();}
  flipJcc(){if(this.phoro.jcc.mode==='off')return;this.phoro.jcc.pos=3-this.phoro.jcc.pos;this.say('已翻到鏡片 '+this.phoro.jcc.pos+'；按「比較 1／2」取得完整文字回答。');}

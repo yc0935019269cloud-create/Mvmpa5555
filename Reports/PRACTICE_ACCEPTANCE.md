@@ -7,7 +7,7 @@
 ## 已實際執行
 
 - `node tools/build-practice-assets.mjs`：產生共用光學／儀器 bundle。
-- `node tools/verify-practice-models.mjs`：**604 checks passed**。含 30 圖卡、遮罩跨圖、程序／編程／30 步限制／儲存、24 個完整雙眼病例、主子午線、WD 防重扣、JCC 軸與度數方向、最大正終點、答案不變、恢復、頂點距離，以及新增 2D 快捷量測／VA 字數／A-P 分離／手動紅綠終點與固定軸盤。
+- `node tools/verify-practice-models.mjs`：**614 checks passed**。含 30 圖卡、遮罩跨圖、程序／編程／30 步限制／儲存、24 個完整雙眼病例、主子午線、WD 防重扣、JCC 軸與度數方向、最大正終點、答案不變、恢復、頂點距離，以及新增 2D 快捷量測／VA 字數／A-P 分離／手動紅綠終點與固定軸盤。
 - Unity `ClinicBuild.Validate`：**255 checks passed**。未修改原 Unity 光學程式，保留既有 WebGL payload。
 - Playwright 真實 Chromium／滑鼠操作：雙眼檢影、工作距離、直接 VA、OD 全部 MSR、OS 全部 MSR，13 步完成。OD 最終 −2.00 / −1.00 ×180、OS −1.50 / −0.75 ×090 與本次輸入相同。
 - JCC 文字由「第二片比較清楚」調到「兩片差不多清楚」，不是固定按步驟給答案。病例答案在進入 JCC 前後不變。
@@ -32,3 +32,7 @@
 本機 server：`python -m http.server 9046 --bind 127.0.0.1 --directory docs`。
 
 Playwright CLI 測試腳本保存在 `tools/qa-practice-browser/`。可用 `npx --yes --package @playwright/cli playwright-cli -s=optometry26 run-code --filename=SCRIPT_PATH` 執行。先開啟 `/modes/refraction.html`；remote 腳本會自行導航。測試只操作本機存檔，會覆寫該測試瀏覽器中的測試病例／程序。
+
+## 雙端軸盤更新
+
+左右眼實際正反向各拖曳兩圈，機械角度連續、雙箭頭對稱、存檔恢復正確，0 page errors。證據：`Reports/practice-axis-rotation-validation.json`。後續中央 JCC 字幕按使用者要求直接提交，未重跑完整流程。
