@@ -35,12 +35,12 @@ class Practice {
  setLevel(v){this.phoro.level=clamp(Math.round(v*2)/2,-5,5);this.emit();}
  setVertex(v){this.phoro.vertex=clamp(Math.round(v),8,24);this.emit();}
  stepSph(e,d){this.phoro[e].s=clamp(q(this.phoro[e].s+d),-20,20);this.afterLens(e);}
- stepCyl(e,d){const l=this.phoro[e],prev=l.c;l.c=clamp(q(l.c+d),-6,0);if(this.autoComp&&this.def.phase==='jcc'){this.compAcc[e]-=(l.c-prev)/2;while(this.compAcc[e]>=.25-1e-8){l.s=clamp(l.s+.25,-20,20);this.compAcc[e]-=.25;}while(this.compAcc[e]<=-.25+1e-8){l.s=clamp(l.s-.25,-20,20);this.compAcc[e]+=.25;}}this.afterLens(e);}
+ stepCyl(e,d){const l=this.phoro[e],prev=l.c;l.c=clamp(q(l.c+d),-6,0);if(this.autoComp&&(this.def.phase==='jcc'||this.phoro.jcc.mode!=='off')){this.compAcc[e]-=(l.c-prev)/2;while(this.compAcc[e]>=.25-1e-8){l.s=clamp(l.s+.25,-20,20);this.compAcc[e]-=.25;}while(this.compAcc[e]<=-.25+1e-8){l.s=clamp(l.s-.25,-20,20);this.compAcc[e]+=.25;}}this.afterLens(e);}
  stepAxis(e,d){this.phoro[e].a=axis(this.phoro[e].a+d);delete this.hist[e].searchAxis;this.afterLens(e);}
  afterLens(e){const p=this.def.phase,h=this.hist[e];if(['mp1','mp2'].includes(p)&&this.def.eye===e){const d=O.toVec(this.lens(e)).M-h.entry[p];h.fogMax[p]=Math.max(h.fogMax[p],d);if(d>=(p==='mp1'?.75:.5)-.01)h.fogged[p]=true;}this.emit();}
- setJccMode(mode){if(!['off','A','P'].includes(mode))return;this.phoro.jcc={mode,pos:1};this.emit();}
+ setJccMode(mode){if(!['off','A','P'].includes(mode))return;this.phoro.jcc={mode,pos:1,selectedMode:mode==='off'?(this.phoro.jcc.selectedMode||'A'):mode};this.emit();}
  flipJcc(){if(this.phoro.jcc.mode==='off')return;this.phoro.jcc.pos=3-this.phoro.jcc.pos;this.say('已翻到鏡片 '+this.phoro.jcc.pos+'；按「比較 1／2」取得完整文字回答。');}
- block(kind='subjective'){const e=this.activeEye,l=this.phoro[e];if(this.def.eye&&e!==this.def.eye)return '目前流程是 '+this.def.eye+'，請先切回該眼。';if(!this.phoro.aperture||this.phoro.occ[e]||l.aux==='OC')return '病患：「這隻眼睛被遮住了，看不到。」';if(kind!=='ret'&&!this.phoro.occ[e==='OD'?'OS':'OD'])return '請遮蓋非測試眼，再做單眼比較。';if(['6ΔU','10ΔI'].includes(l.aux))return '病患：「影像分開了。」請移開輔助稜鏡再比較清晰度。';if(Math.abs(this.phoro.level)>2)return '驗光儀尚未調平，請先將氣泡對準中央。';if(kind==='jcc'&&l.aux!=='O')return 'JCC 比較前請將輔助鏡轉到 O。';return '';}
+ block(kind='subjective'){const e=this.activeEye,l=this.phoro[e];if(!this.assisted&&this.def.eye&&e!==this.def.eye)return '目前流程是 '+this.def.eye+'，請先切回該眼。';if(!this.phoro.aperture||this.phoro.occ[e]||l.aux==='OC')return '病患：「這隻眼睛被遮住了，看不到。」';if(kind!=='ret'&&!this.phoro.occ[e==='OD'?'OS':'OD'])return '請遮蓋非測試眼，再做單眼比較。';if(['6ΔU','10ΔI'].includes(l.aux))return '病患：「影像分開了。」請移開輔助稜鏡再比較清晰度。';if(Math.abs(this.phoro.level)>2)return '驗光儀尚未調平，請先將氣泡對準中央。';if(kind==='jcc'&&l.aux!=='O')return 'JCC 比較前請將輔助鏡轉到 O。';return '';}
  acuity(e=this.activeEye,lens=this.lens(e),ph=this.phoro[e].aux==='PH'){let r=O.subVec(this.effective(e,lens),O.toVec(this.truth[e]));
  // Excess minus can be partly accommodated, but never raises the best available VA.
  const b=Math.hypot(r.M<0?r.M*.10:r.M,r.J0,r.J45)*(ph?.35:1);const va=1.2*Math.pow(10,-Math.max(0,b-.08)*.65);const rows=[.05,...O.VA_ROWS];return rows.filter(v=>v<=va+.015).at(-1)||.05;}

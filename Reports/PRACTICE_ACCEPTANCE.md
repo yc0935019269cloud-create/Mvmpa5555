@@ -1,16 +1,17 @@
 # 2026-10-26 獨立模式驗收
 
-範圍：本機新增 ACP-8 遙控器／投影機、2D 綜合驗光儀。未推送遠端，未重新建置 Unity WebGL。本次未聲稱專業臨床驗證或真實患者預測。
+範圍：ACP-8 遙控器／投影機及 2D 綜合驗光儀。原版已在 main（ee19543）及 Pages；WebGL 已實際重建成功（12,638,085 bytes、0 errors）。本次追加 2D 快捷操作接續發布，未聲稱專業臨床驗證或真實患者預測。
 
 ## 已實際執行
 
 - `node tools/build-practice-assets.mjs`：產生共用光學／儀器 bundle。
-- `node tools/verify-practice-models.mjs`：**585 checks passed**。含 30 圖卡、遮罩跨圖、程序／編程／30 步限制／儲存、24 個完整雙眼病例、主子午線、WD 防重扣、JCC 軸與度數方向、最大正終點、答案不變、恢復及頂點距離。
+- `node tools/verify-practice-models.mjs`：**604 checks passed**。含 30 圖卡、遮罩跨圖、程序／編程／30 步限制／儲存、24 個完整雙眼病例、主子午線、WD 防重扣、JCC 軸與度數方向、最大正終點、答案不變、恢復、頂點距離，以及新增 2D 快捷量測／VA 字數／A-P 分離／手動紅綠終點與固定軸盤。
 - Unity `ClinicBuild.Validate`：**255 checks passed**。未修改原 Unity 光學程式，保留既有 WebGL payload。
 - Playwright 真實 Chromium／滑鼠操作：雙眼檢影、工作距離、直接 VA、OD 全部 MSR、OS 全部 MSR，13 步完成。OD 最終 −2.00 / −1.00 ×180、OS −1.50 / −0.75 ×090 與本次輸入相同。
 - JCC 文字由「第二片比較清楚」調到「兩片差不多清楚」，不是固定按步驟給答案。病例答案在進入 JCC 前後不變。
-- 真實拖曳：OD／OS 外輪向上各 0→−0.50D，OD 向下 −0.50→0；額托 12→9mm；O→OC 遮眼、OC→O 開放；JCC 支桿拖到窺孔、滾輪翻面到 2、拖開回 off；檢影圓形套筒拖曳至 90°。
+- 真實拖曳：OD／OS 外輪向上各 0→−0.50D，OD 向下 −0.50→0；額托 12→9mm；O→OC 遮眼、OC→O 開放；JCC 支桿拖到窺孔、滾輪翻面到 2、拖開回 off；水平檢影套筒直接左右拖曳並改變光條方向。
 - 直接拖曳的機器可讀結果：`Reports/practice-direct-input-validation.json`。主覺階段檢影光帶已停止，JCC 在窺孔前不會被檢影 Canvas 蓋住；額托另有 12mm 側視刻度示意。
+- 新增 2D 快捷操作的真實 UI 驗證：`Reports/practice-assisted-controls-validation.json`。JCC 自動翻面完整出現「這是 1／這是 2／哪一個清楚」並依鏡片得到三種回答；MPMVA 只改指定眼球面；第二次雙眼 MPMVA 不新增紅綠詢問；連續兩次加負回綠不替使用者退鏡。水平套筒、固定軸盤／紅箭頭、收合與偷看處方、兩種行動尺寸皆通過，0 page errors。
 - 瀏覽器逐一點 30 個照片圖卡鍵，43 個實體互動鍵存在；遮罩跨到下一張同類 E 表；實體鍵編寫 P1／RESET 回第一步／重載保留。
 - 保存／重新載入恢復完成進度，紀錄文字檔實際下載成功。
 - 1440×1100 桌機、1024×768、390×844 版面檢查；整頁無水平溢出。未在實體 iPad 上執行。

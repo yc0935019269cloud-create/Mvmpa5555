@@ -1,10 +1,11 @@
 {
-  "date": "2026-10-26T08:30:19.135Z",
-  "checks": 585,
+  "date": "2026-10-26T15:02:41.521Z",
+  "checks": 604,
   "status": "passed",
   "scenarios": {
     "chartPlates": 30,
-    "randomClinicalCases": 24
+    "randomClinicalCases": 24,
+    "assisted2D": true
   },
   "evidence": [
     "PASS A type has all 30 chart plates",
@@ -591,6 +592,25 @@
     "PASS ideal case has no extra objective bias",
     "PASS vertex distance changes optical power for high prescriptions",
     "PASS pinhole improves or preserves predicted VA",
-    "PASS deferred auxiliary lenses and prism are not exposed as working controls"
+    "PASS deferred auxiliary lenses and prism are not exposed as working controls",
+    "PASS A/P selection does not insert the parked JCC",
+    "PASS separate placement uses selected JCC mode",
+    "PASS A/P changes optical orientation while JCC remains inserted",
+    "PASS separate retraction parks JCC",
+    "PASS assisted first MPMVA preserves cylinder and axis",
+    "PASS assisted first MPMVA adjusts the requested sphere",
+    "PASS OD assisted MPMVA does not change OS lenses",
+    "PASS assisted MPMVA records letter-level VA notation",
+    "PASS retinoscopy VA button measures without secretly changing lenses or subtracting WD",
+    "PASS partial letter readings produce VA plus/minus suffixes",
+    "PASS red-green endpoint starts with first green",
+    "PASS repeating the same lens does not count as another minus step",
+    "PASS two real minus steps can produce consecutive green responses",
+    "PASS duochrome never automatically retreats the negative lens",
+    "PASS manual plus retreat resets the consecutive-minus counter",
+    "PASS both eyes can receive assisted second MPMVA",
+    "PASS second MPMVA does not automatically enter red-green",
+    "PASS printed cylinder axis scale stays fixed when axis changes",
+    "PASS moving red axis indicator is rendered separately"
   ]
 }

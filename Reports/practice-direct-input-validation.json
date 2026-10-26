@@ -41,8 +41,9 @@
       "mode": "off"
     },
     {
-      "action": "retinoscope sleeve drag",
-      "angle": "90"
+      "action": "horizontal retinoscope sleeve drag",
+      "before": "150",
+      "angle": "30"
     }
   ],
   "consoleErrors": 0

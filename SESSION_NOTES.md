@@ -2,9 +2,19 @@
 
 ## 2026-10-26 新增 ACP-8 與 2D 驗光模式（本機驗證完成，待發布）
 
-**目前狀態：本機兩模式已可操作，585 項模型檢查及完整瀏覽器流程通過；尚未 Git commit／push／Pages 發布。** 以下保留開發歷程，請以最新摘要及暫緩清單為準。程式與交接分別見 `Documentation/PRACTICE_MODES.md`、`Reports/PRACTICE_ACCEPTANCE.md`。下次繼續請先看這三份文件。
+**目前狀態：原版兩模式已在 main（ee19543）與 Pages；追加的 2D 快捷操作通過 604 項模型檢查及完整瀏覽器回歸，使用者再次確認「做好沒問題就發布」，本次接續提交 main。** 以下保留開發歷程，請以最新摘要及暫緩清單為準。程式與交接分別見 `Documentation/PRACTICE_MODES.md`、`Reports/PRACTICE_ACCEPTANCE.md`。
 
 ### 發布進度（使用者已要求推上 Git 並合入）
+
+- 已確認 ee19543 原版提交已在 origin/main，對應 Pages run 40293344910 成功；本次把之後新增的 2D 操作接續提交，沒有重寫既有 Git 歷史。
+- 最新 2D：左側「VA 相關」與下方 EXAMINATION 可收合；偷看處方；檢影 VA 有 ±字數；第一次逐眼 MPMVA／逐眼紅綠／第二次逐眼與雙眼 MPMVA。只改指定眼球面，柱面軸保留，紅綠退鏡由使用者自己做。
+- JCC 放入／收回與 A/P 獨立，詢問鍵自動翻 1／2 並逐句顯示。瀏覽器實際測到第一片／第二片／差不多三種回答；沒有按次數輪流給答案。
+- 水平套筒輪可左右拖曳；軸盤固定，0/180 水平，紅箭頭隨軸位轉。新版直接拖曳回歸、13 步完整流程、1024×768／390×844 無整頁溢出皆通過。
+- 最新證據：`Reports/practice-assisted-controls-validation.json`、`Reports/practice-direct-input-validation.json`、`Reports/practice-model-validation.json`（604 項）。首次發布前已真實重建 WebGL：Succeeded、12,638,085 bytes、0 errors；Unity 255 checks passed。
+- 先前筆記中的「未提交／未發布／圓形套筒」屬開發歷程；請以上方最新狀態為準。這批快捷調整僅限 2D，不改原 Unity 診間或 ACP-8 的互動。
+
+- 推送前使用者新增一批操作要求，**僅限 2D 綜合驗光儀**：左側可收合 VA／MPMVA／紅綠模擬按鈕，EXAMINATION 移到下方且可收合，偷看處方；JCC 放入與 A/P 分開，詢問時自動翻 1／2 後顯示回答；VA 顯示 ±字數；水平可拖曳套筒；固定軸盤、0/180 水平、外圈紅箭頭指軸。先完成此批再一起推送 main，尚未 push。
+- 這批新按鈕不適用原 Unity 診間或 ACP-8 模式。新的 MPMVA 按鈕只改指定眼球面、保留柱面與軸；紅綠仍由使用者手動調鏡，連續兩次加負回綠時不自動退鏡。
 
 - 已 fetch 確認 main 與 origin/main 同步，無需解衝突；本次將直接提交到 main。
 - 依專案規則已啟動真正的 Unity WebGL 重新建置，完成後再執行 2D 檢查與瀏覽器驗證。
