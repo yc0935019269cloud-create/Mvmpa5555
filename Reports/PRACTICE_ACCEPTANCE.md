@@ -1,6 +1,8 @@
 # 2026-10-26 獨立模式驗收
 
-範圍：ACP-8 遙控器／投影機及 2D 綜合驗光儀。原版已在 main（ee19543）及 Pages；WebGL 已實際重建成功（12,638,085 bytes、0 errors）。本次追加 2D 快捷操作接續發布，未聲稱專業臨床驗證或真實患者預測。
+範圍：ACP-8 遙控器／投影機及 2D 綜合驗光儀。追加的 2D 快捷操作已合入 main（5fc5582）並由 Pages run 40345501044 發布成功；WebGL 已實際重建成功（12,638,085 bytes、0 errors）。未聲稱專業臨床驗證或真實患者預測。
+
+正式 2D 網址：<https://yc0935019269cloud-create.github.io/Mvmpa5555/modes/refraction.html>。正式站重新執行 `assisted-controls.cjs`，VA／MPMVA／紅綠、JCC 自動翻面與三種回答、固定軸盤／紅箭頭、套筒、收合與偷看處方、兩種行動視口皆通過，0 page errors。證據：`Reports/practice-public-validation.json`。
 
 ## 已實際執行
 

@@ -2,9 +2,14 @@
 
 ## 2026-10-26 新增 ACP-8 與 2D 驗光模式（本機驗證完成，待發布）
 
-**目前狀態：原版兩模式已在 main（ee19543）與 Pages；追加的 2D 快捷操作通過 604 項模型檢查及完整瀏覽器回歸，使用者再次確認「做好沒問題就發布」，本次接續提交 main。** 以下保留開發歷程，請以最新摘要及暫緩清單為準。程式與交接分別見 `Documentation/PRACTICE_MODES.md`、`Reports/PRACTICE_ACCEPTANCE.md`。
+**目前狀態：2D 快捷操作已提交 main，功能 commit `5fc5582d64e1afa07f1a043329af16ec91e153b3`，Pages run `40345501044` 成功；正式網址已重測通過，0 page errors。模型共 604 項通過。** 以下保留開發歷程，請以最新摘要及暫緩清單為準。程式與交接分別見 `Documentation/PRACTICE_MODES.md`、`Reports/PRACTICE_ACCEPTANCE.md`。
 
 ### 發布進度（使用者已要求推上 Git 並合入）
+
+- 正式 2D：`https://yc0935019269cloud-create.github.io/Mvmpa5555/modes/refraction.html`；模式選單：`https://yc0935019269cloud-create.github.io/Mvmpa5555/modes/index.html`。
+- 功能提交：`5fc5582`；GitHub Pages workflow `40345501044` success。正式站已實際點擊 VA／MPMVA／紅綠按鈕、JCC 三種文字回答／自動翻面、處方偷看與收合、固定軸盤／紅箭頭、水平套筒；1024×768 與 390×844 無整頁水平溢出。
+- 公開站機器可讀驗證：`Reports/practice-public-validation.json`，記錄來源網址、功能 commit、Pages run、操作與 0 console errors。本次筆記同步為後續文件提交，功能程式仍由 `5fc5582` 提供。
+- 快捷功能的光學／量測在 `docs/modes/practice-assist-model.js`，左側操作在 `practice-assist-ui.js`；主 UI 暴露 `Practice2DUI`，JCC 動畫與控制在 `refraction.js`。`practice-assist-model.js` 必須在主 UI 之前載入；UI 檔最後載入。樣式 `practice-assist.css` 只適用 2D。
 
 - 已確認 ee19543 原版提交已在 origin/main，對應 Pages run 40293344910 成功；本次把之後新增的 2D 操作接續提交，沒有重寫既有 Git 歷史。
 - 最新 2D：左側「VA 相關」與下方 EXAMINATION 可收合；偷看處方；檢影 VA 有 ±字數；第一次逐眼 MPMVA／逐眼紅綠／第二次逐眼與雙眼 MPMVA。只改指定眼球面，柱面軸保留，紅綠退鏡由使用者自己做。

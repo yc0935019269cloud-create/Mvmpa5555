@@ -1,0 +1,25 @@
+{
+  "status": "passed",
+  "proof": [
+    "Collapsible VA panel precedes EXAMINATION; prescription reveal/hide works",
+    "Separate first MPMVA buttons adjust only requested sphere and return VA",
+    "Consecutive green is detected only after actual minus change; retreat stays manual",
+    {
+      "action": "Animated JCC produces 1, 2 and equal according to lenses",
+      "replies": [
+        "驗光師：這是 1。\n驗光師：這是 2。\n驗光師：哪一個比較清楚？\n病患：第一片比較清楚。",
+        "驗光師：這是 1。\n驗光師：這是 2。\n驗光師：哪一個比較清楚？\n病患：第二片比較清楚。",
+        "驗光師：這是 1。\n驗光師：這是 2。\n驗光師：哪一個比較清楚？\n病患：兩片差不多清楚。"
+      ]
+    },
+    "Second bilateral MPMVA returns both VA results without red-green",
+    "Axis numerals stay fixed and red arrow moves",
+    "Horizontal ridged sleeve turns via direct lateral drag",
+    "No page overflow 1024x768",
+    "No page overflow 390x844"
+  ],
+  "consoleErrors": 0,
+  "url": "https://yc0935019269cloud-create.github.io/Mvmpa5555/modes/refraction.html",
+  "featureCommit": "5fc5582d64e1afa07f1a043329af16ec91e153b3",
+  "pagesRun": 40345501044
+}
