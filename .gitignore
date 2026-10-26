@@ -15,3 +15,5 @@ __pycache__/
 Reports/*.traceevents
 Reports/*.dag*
 _site/
+/work/
+/.playwright-cli/

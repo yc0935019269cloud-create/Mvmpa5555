@@ -1,5 +1,63 @@
 # 工作紀錄
 
+## 2026-10-26 新增 ACP-8 與 2D 驗光模式（本機驗證完成，待發布）
+
+**目前狀態：本機兩模式已可操作，585 項模型檢查及完整瀏覽器流程通過；尚未 Git commit／push／Pages 發布。** 以下保留開發歷程，請以最新摘要及暫緩清單為準。程式與交接分別見 `Documentation/PRACTICE_MODES.md`、`Reports/PRACTICE_ACCEPTANCE.md`。下次繼續請先看這三份文件。
+
+### 發布進度（使用者已要求推上 Git 並合入）
+
+- 已 fetch 確認 main 與 origin/main 同步，無需解衝突；本次將直接提交到 main。
+- 依專案規則已啟動真正的 Unity WebGL 重新建置，完成後再執行 2D 檢查與瀏覽器驗證。
+- 新增 Pages workflow 的 2D 模型檢查，避免僅依舊報告發布；既有模型預覽 `Reports/mpfb_assets_preview.png` 不會納入提交。
+- 下方「尚未發布」等敘述保留當時開發歷程，最終發布結果將更新在本節。
+
+- 本機預覽：`http://127.0.0.1:9046/modes/index.html`。若服務未在執行，於 repo 執行 `python -m http.server 9046 --bind 127.0.0.1 --directory docs`。也可直接雙擊 `docs/modes/index.html`（兩個新增模式已驗證 file://，原 Unity 診間仍需 HTTP）。
+- 最終重建與檢查：`node tools/build-practice-assets.mjs`、`node tools/verify-practice-models.mjs`、`node tools/verify-site.mjs` 全通過；C# 驗證 255 通過。沒有重建／替換原 Unity WebGL 的 data／wasm。
+- 瀏覽器測試腳本在 `tools/qa-practice-browser/`；直接拖曳證據另存 `Reports/practice-direct-input-validation.json`（9 項真實操作、0 page errors）。完整流程和 ACP-8 證據摘要在 `Reports/PRACTICE_ACCEPTANCE.md`。
+- 後續建置 `tools/build.ps1` 已接入 2D bundle、入口與模型檢查；首頁入口同時寫入 Unity 模板，避免下次建置覆蓋。尚未自動發布或提交。
+
+### 使用者明確指定暫緩的功能（2026-10-26 最新範圍）
+
+以下是使用者要求「先不做」，不得列為完成，也不應做成看似可用但沒有作用的選項：
+
+- 旋轉稜鏡（Risley Prism，0–20Δ）。
+- R（Retinoscopy lens，+1.50D／+2.00D 檢影鏡片）。不是紅色濾片，舊 2D 程式對 R 的命名／用途不應直接沿用到新模式。
+- P（Polaroid，偏光鏡片）。
+- WMV／RMV（白／紅 Maddox 馬氏桿、隱斜視相關檢查）。
+- 內建 ±0.50 交叉圓柱鏡及 ADD 相關檢查。
+
+仍在本次範圍：外觀依最新實機照片重整、直接拖曳旋鈕、PD／氣泡水平／額托頂點距離、球面／柱面／軸位、O／OC 實際遮蓋、JCC 外掛可以拖至窺孔前再翻面，以及既定雙眼檢影與逐眼 MSR 流程。暫緩內建 ±0.50 不代表取消流程中的外掛 JCC ±0.25。
+
+其他尚未完成驗收／實機確認的項目：新外觀與 JCC 懸掛手柄的拖曳正在調整；手機紀錄單版面發現橫向溢出，待修；ACP-8 出廠 P1/P2 全程序、實體遮罩孔徑幾何及投影光學亮度缺少足夠資料，不能冒稱與實機完全一致。未執行遠端發布。
+
+- 使用者要求新增獨立 ACP-8 遙控器／投影機模擬及完整 2D 綜合驗光儀模式。新模式先雙眼檢影，再依序做右眼整套 MSR、左眼整套 MSR；VA 直接給數值。
+- 使用者指出原遙控器錯誤，已提供 `E:\下載資料夾\topcon-acp-8-instruction-manual.pdf`。已核對印刷頁 9、15–17；選表／遮罩移動／程序前後／RESET 必須依手冊重做。
+- 找到並查看原廠 A 型 30 圖卡，照片與 A 型面板對應。手冊缺少完整出廠 P1/P2 與精確遮罩幾何，不能冒稱這些已與實機完全一致。
+- 已新增 `Documentation/PRACTICE_MODES.md`：需求、來源、已完成、待辦及接續方式。使用者要求持續更新此文件及本 session note。
+- 已建立 `docs/modes/` 的入口、遙控器頁與 CSS 初稿，並新增抽離既有 2D 儀器的 `tools/build-practice-assets.mjs`。尚未完成狀態機與 2D 流程，尚未通過測試、未提交或發布。
+- 原有未追蹤 `Reports/mpfb_assets_preview.png` 不屬本次工作。
+
+### 階段更新：模式已接通，驗收修正中
+
+### 後續驗證結果（最新實機照片版）
+
+- 儀器改成新的 `docs/modes/instrument-svg.js`（1000×760），依最新參考照片重整輪廓與旋鈕配置，柱面度數與軸位改為同軸。PD 兩側旋鈕連動、中央 PD 刻度、氣泡、額托 VD 都可操作。球面負數讀數用紅字，窗口在外側輪緣。
+- 輔助鏡目前僅 O／OC／PH／RG／+.12；暫緩的 R、P、Maddox、±.50、稜鏡不提供成選項。外掛 ±.25 JCC 保留。
+- 真實滑鼠測試：OD／OS 大轉盤上拖均由 0→−0.50D；OD 下拖回 0；旋鈕切 OC 會遮眼、切 O 恢復；額托拖曳由 12→9mm；JCC 支桿可拖到窺孔前、滾輪翻至第 2 面、拖開恢復 off。此版檢查 0 console errors。
+- 瀏覽器以實際 UI 走完 13 步雙眼流程：OD 最終 −2.00/−1.00×180、OS −1.50/−0.75×090，與本次設定答案相同；JCC 由「第二片較清楚」調到「兩片差不多清楚」。重新載入恢復 completed stage12、下載紀錄成功。
+- 1024×768 與 390×844 無整頁水平溢出，已修正早期手機 workflow 溢出。這是瀏覽器視口驗證，不冒稱已在實體 iPad 上測試。
+- ACP-8 瀏覽器逐一點擊 30 個圖卡鍵均正確；43 個互動鍵存在；遮罩跨到下一張同類 E 表；實體鍵寫入 P1、RESET 回第一步、重載保留；桌機／平板尺寸／手機尺寸及 file:// 測試通過。
+- 2D 儀器也通過 file:// 開啟與實際調鏡；尚未發布遠端。完整驗收整理將放 `Reports/PRACTICE_ACCEPTANCE.md`。
+
+- 使用者補充儀器手感：所有旋鈕維持直接拖曳；大球面輪「向上拖＝加負、向下拖＝加正」；球面讀數窗移到照片圈出的兩側輪緣；O／OC 必須實際改變遮蓋、病患視野及回答。此要求覆寫舊 2D 程式的向上加正方向。檢影角度也改為可拖曳圓盤，避免以滑動桿為主。
+
+- 已有 A 型 30 圖卡向量資源、照片按鍵 43 個（30 圖卡＋13 控制；中央九點為方向圖示而非按鍵，已校正初期筆記的 44）、ACP-8 狀態機、P1/P2 編寫／匯出／匯入、10 分鐘自動熄燈。
+- `docs/modes/refraction.html` 已串起既有 SVG 儀器與檢影 Canvas。流程為雙眼檢影、WD、直接 VA、完整右眼 MSR、完整左眼 MSR。病例種子固定檢影觀察偏移，JCC 不改答案。
+- `node tools/verify-practice-models.mjs` 首輪通過 **585 項檢查**，含 24 個雙眼完整病例、JCC 軸／度數誤差、自然差異、WD 防止重扣、程序邊界及存檔恢復；證據 `Reports/practice-model-validation.json`。
+- Unity 原有 `ClinicBuild.Validate` 本次實際執行 **255 checks passed**，Unity log `work/unity-validate.log`，沒有重新建置 WebGL。
+- Playwright 已實際載入遙控器與 2D 模式，首輪 2D console 為 0 errors / 0 warnings。視覺檢查找到型錄圖卡裁切帶入邊界／鄰圖，已修正偏移與裁切；尚需複核全部圖卡與響應式畫面。
+- 投影幕版面正在改為位於遙控器上方，並在捲動照片按鍵時保留預覽。尚未發布或提交。
+
 ## 2026-10-15 重製開始
 
 - 使用者授權新建資料夾、用 Unity 與 Blender 重製第一人稱驗光遊戲，完成後替換 Mvmpa5555 並啟用 Pages。

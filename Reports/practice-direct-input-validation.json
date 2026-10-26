@@ -1,0 +1,49 @@
+{
+  "status": "passed",
+  "evidence": [
+    {
+      "action": "OD wheel up",
+      "before": 0,
+      "after": -0.5
+    },
+    {
+      "action": "OS wheel up",
+      "before": 0,
+      "after": -0.5
+    },
+    {
+      "action": "OD wheel down",
+      "before": -0.5,
+      "after": 0
+    },
+    {
+      "action": "physical auxiliary knob to OC",
+      "aux": "OC",
+      "occluded": true
+    },
+    {
+      "action": "auxiliary knob to O",
+      "aux": "O",
+      "occluded": false
+    },
+    {
+      "action": "vertex direct drag",
+      "before": 12,
+      "after": 9
+    },
+    {
+      "action": "JCC dragged to aperture and flipped",
+      "mode": "A",
+      "face": 2
+    },
+    {
+      "action": "JCC dragged away",
+      "mode": "off"
+    },
+    {
+      "action": "retinoscope sleeve drag",
+      "angle": "90"
+    }
+  ],
+  "consoleErrors": 0
+}

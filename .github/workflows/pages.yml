@@ -23,6 +23,8 @@ jobs:
           node-version: 22
       - name: Verify actual Unity payloads and local validation reports
         run: node tools/verify-site.mjs
+      - name: Verify ACP-8 controls and 2D refraction cases
+        run: node tools/verify-practice-models.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -22,4 +22,6 @@ if(new URLSearchParams(location.search).get('qa')==='1'){document.getElementById
 window.addEventListener('keydown',e=>{if(['Tab','Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)&&document.activeElement===canvas)e.preventDefault();});
 document.addEventListener('pointerlockchange',()=>{if(window.clinicUnity)window.clinicUnity.SendMessage('Clinic runtime','PointerState',document.pointerLockElement===canvas?'1':'0');});
 canvas.addEventListener('pointerdown',e=>{if(window.clinicWantsLook&&e.button===0){try{const p=canvas.requestPointerLock();if(p&&p.catch)p.catch(()=>{});}catch(error){}}});
-</script></body></html>
+</script>
+<nav id="practice-modes" aria-label="獨立練習模式" style="position:fixed;top:12px;right:12px;z-index:5;display:flex;gap:6px;font:13px system-ui"><a href="modes/index.html" style="background:#162b2bea;color:#d8bd80;border:1px solid #78908688;border-radius:5px;padding:9px 12px;text-decoration:none">全部練習模式</a><a href="modes/remote.html" style="background:#162b2bea;color:#eaeada;border:1px solid #78908688;border-radius:5px;padding:9px 12px;text-decoration:none">ACP-8 遙控器</a><a href="modes/refraction.html" style="background:#162b2bea;color:#eaeada;border:1px solid #78908688;border-radius:5px;padding:9px 12px;text-decoration:none">2D 驗光</a></nav>
+</body></html>

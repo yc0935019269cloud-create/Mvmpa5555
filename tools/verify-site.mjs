@@ -24,4 +24,6 @@ assert(html.includes('id="clinic-music" loop'), 'Background track must loop');
 const music=fs.readFileSync(path.join(site,musicRel));
 const original=fs.readFileSync(path.join(root,'UnityProject/Assets',musicRel));
 assert.equal(crypto.createHash('sha256').update(music).digest('hex'),crypto.createHash('sha256').update(original).digest('hex'),'Published music matches supplied audio');
+for(const f of ['modes/index.html','modes/remote.html','modes/refraction.html','modes/refraction-model.js','modes/refraction.js','modes/assets/chart-data.js','modes/assets/acp8-chart-source.svg','modes/assets/acp8-photo.png','modes/assets/legacy-instruments.js'])assert(fs.existsSync(path.join(site,f)),`Missing standalone practice resource: ${f}`);
+assert(html.includes('modes/index.html'),'Homepage links to the standalone modes');
 console.log(`Unity WebGL deployment preflight passed: ${checked} payloads + loader + clinical/build reports`);

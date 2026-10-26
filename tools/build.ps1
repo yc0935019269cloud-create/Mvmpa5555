@@ -18,5 +18,11 @@ if($LASTEXITCODE -ne 0){throw 'Font subset failed (install fonttools)'}
 $unityArgs=@('-batchmode','-nographics','-projectPath',('"'+(Join-Path $projectRoot 'UnityProject')+'"'),'-executeMethod','ClinicBuild.Build','-buildTarget','WebGL','-quit','-logFile',('"'+(Join-Path $projectRoot 'Reports\unity-build.log')+'"'))
 $buildProcess=Start-Process -FilePath $Unity -ArgumentList $unityArgs -PassThru -Wait -WindowStyle Hidden
 if($buildProcess.ExitCode -ne 0){throw 'Unity build failed; see Reports\unity-build.log'}
+& node (Join-Path $PSScriptRoot 'build-practice-assets.mjs')
+if($LASTEXITCODE -ne 0){throw 'Standalone practice bundle failed'}
+& node (Join-Path $PSScriptRoot 'link-practice-modes.mjs')
+if($LASTEXITCODE -ne 0){throw 'Standalone mode links failed'}
+& node (Join-Path $PSScriptRoot 'verify-practice-models.mjs')
+if($LASTEXITCODE -ne 0){throw 'Standalone clinical/control model checks failed'}
 & node (Join-Path $PSScriptRoot 'verify-site.mjs')
 if($LASTEXITCODE -ne 0){throw 'Web deployment preflight failed'}
